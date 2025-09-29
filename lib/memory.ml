@@ -98,3 +98,103 @@ let get_answer mem =
       match get_variable mem "final_answer" with
       | Some (`String s) -> Some s
       | _ -> None
+
+(* Serialization for state persistence *)
+
+let status_to_yojson = function
+  | In_progress -> `Assoc [ "type", `String "in_progress" ]
+  | Completed answer ->
+      `Assoc [ "type", `String "completed"; "answer", `String answer ]
+  | Failed reason -> `Assoc [ "type", `String "failed"; "reason", `String reason ]
+
+let status_of_yojson json =
+  try
+    let open Yojson.Safe.Util in
+    let typ = json |> member "type" |> to_string in
+    match typ with
+    | "in_progress" -> Ok In_progress
+    | "completed" ->
+        let answer = json |> member "answer" |> to_string in
+        Ok (Completed answer)
+    | "failed" ->
+        let reason = json |> member "reason" |> to_string in
+        Ok (Failed reason)
+    | _ -> Error (Printf.sprintf "Unknown status type: %s" typ)
+  with Yojson.Safe.Util.Type_error (msg, _) ->
+    Error (Printf.sprintf "Failed to parse status: %s" msg)
+
+let to_yojson mem =
+  let variables_list =
+    data_snapshot mem |> List.map (fun (k, v) -> `Assoc [ "key", `String k; "value", v ])
+  in
+  `Assoc
+    [
+      "version", `Int 1;
+      "goal", `String mem.goal;
+      "status", status_to_yojson mem.status;
+      "last_result", (match mem.last_result with None -> `Null | Some r -> `String r);
+      "iterations", `Int mem.iterations;
+      "variables", `List variables_list;
+    ]
+
+let of_yojson json =
+  try
+    let open Yojson.Safe.Util in
+    let version = json |> member "version" |> to_int in
+    if version <> 1 then
+      Error (Printf.sprintf "Unsupported schema version: %d" version)
+    else
+      let goal = json |> member "goal" |> to_string in
+      let status_json = json |> member "status" in
+      let last_result =
+        match json |> member "last_result" with
+        | `Null -> None
+        | `String s -> Some s
+        | _ -> None
+      in
+      let iterations = json |> member "iterations" |> to_int in
+      let variables_json = json |> member "variables" |> to_list in
+      match status_of_yojson status_json with
+      | Error e -> Error e
+      | Ok status ->
+          let variables = Hashtbl.create 32 in
+          List.iter
+            (fun var_obj ->
+              let key = var_obj |> member "key" |> to_string in
+              let value = var_obj |> member "value" in
+              Hashtbl.add variables key value)
+            variables_json;
+          Ok { goal; variables; status; last_result; iterations }
+  with
+  | Yojson.Safe.Util.Type_error (msg, _) ->
+      Error (Printf.sprintf "Failed to parse memory: %s" msg)
+  | e -> Error (Printf.sprintf "Unexpected error: %s" (Printexc.to_string e))
+
+let save_to_file mem path =
+  try
+    let json = to_yojson mem in
+    let json_string = Yojson.Safe.pretty_to_string json in
+    let oc = open_out path in
+    Fun.protect
+      ~finally:(fun () -> close_out_noerr oc)
+      (fun () ->
+        output_string oc json_string;
+        Ok ())
+  with e -> Error (Printf.sprintf "Failed to save state: %s" (Printexc.to_string e))
+
+let load_from_file path =
+  try
+    if not (Sys.file_exists path) then
+      Error (Printf.sprintf "State file not found: %s" path)
+    else
+      let ic = open_in path in
+      Fun.protect
+        ~finally:(fun () -> close_in_noerr ic)
+        (fun () ->
+          let json_string = really_input_string ic (in_channel_length ic) in
+          let json = Yojson.Safe.from_string json_string in
+          of_yojson json)
+  with
+  | Yojson.Json_error msg ->
+      Error (Printf.sprintf "Failed to parse state file: %s" msg)
+  | e -> Error (Printf.sprintf "Failed to load state: %s" (Printexc.to_string e))

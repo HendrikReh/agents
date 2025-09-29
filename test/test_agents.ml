@@ -69,6 +69,96 @@ let test_summary_excerpt () =
   let summary = Tools.summary_excerpt mem in
   assert (String.length summary <= Tools.max_summary_length)
 
+(* State persistence tests *)
+let test_memory_serialization_roundtrip () =
+  let mem = Memory.init "Test goal for serialization" in
+  Memory.set_variable_string mem "key1" "value1";
+  Memory.set_variable mem "key2" (`Int 42);
+  Memory.set_variable mem "key3" (`List [ `String "a"; `String "b" ]);
+  Memory.set_last_result mem "Last result text";
+  Memory.bump_iteration mem;
+  Memory.bump_iteration mem;
+
+  (* Serialize and deserialize *)
+  let json = Memory.to_yojson mem in
+  match Memory.of_yojson json with
+  | Error msg -> Printf.printf "Deserialization failed: %s\n" msg; assert false
+  | Ok restored ->
+      assert (Memory.goal restored = "Test goal for serialization");
+      assert (Memory.iterations restored = 2);
+      assert (Memory.last_result restored = Some "Last result text");
+      (match Memory.get_variable restored "key1" with
+       | Some (`String v) -> assert (v = "value1")
+       | _ -> assert false);
+      (match Memory.get_variable restored "key2" with
+       | Some (`Int v) -> assert (v = 42)
+       | _ -> assert false);
+      (match Memory.get_variable restored "key3" with
+       | Some (`List _) -> ()
+       | _ -> assert false)
+
+let test_memory_status_serialization () =
+  let mem = Memory.init "Test status" in
+
+  (* Test In_progress status *)
+  let json1 = Memory.to_yojson mem in
+  (match Memory.of_yojson json1 with
+   | Ok restored -> assert (Memory.status restored = Memory.In_progress)
+   | Error _ -> assert false);
+
+  (* Test Completed status *)
+  Memory.mark_completed mem "Test answer";
+  let json2 = Memory.to_yojson mem in
+  (match Memory.of_yojson json2 with
+   | Ok restored ->
+       (match Memory.status restored with
+        | Memory.Completed answer -> assert (answer = "Test answer")
+        | _ -> assert false)
+   | Error _ -> assert false);
+
+  (* Test Failed status *)
+  let mem2 = Memory.init "Test failed" in
+  Memory.mark_failed mem2 ~reason:"Test failure";
+  let json3 = Memory.to_yojson mem2 in
+  (match Memory.of_yojson json3 with
+   | Ok restored ->
+       (match Memory.status restored with
+        | Memory.Failed reason -> assert (reason = "Test failure")
+        | _ -> assert false)
+   | Error _ -> assert false)
+
+let test_memory_save_load_file () =
+  let temp_file = Filename.temp_file "agent_test" ".json" in
+
+  (* Create and save memory *)
+  let mem = Memory.init "File persistence test" in
+  Memory.set_variable_string mem "saved_var" "saved_value";
+  Memory.bump_iteration mem;
+
+  (match Memory.save_to_file mem temp_file with
+   | Error msg -> Printf.printf "Save failed: %s\n" msg; assert false
+   | Ok () -> ());
+
+  (* Load and verify *)
+  (match Memory.load_from_file temp_file with
+   | Error msg -> Printf.printf "Load failed: %s\n" msg; assert false
+   | Ok restored ->
+       assert (Memory.goal restored = "File persistence test");
+       assert (Memory.iterations restored = 1);
+       (match Memory.get_variable restored "saved_var" with
+        | Some (`String v) -> assert (v = "saved_value")
+        | _ -> assert false));
+
+  (* Clean up *)
+  Sys.remove temp_file
+
+let test_memory_load_nonexistent () =
+  match Memory.load_from_file "/nonexistent/path/to/file.json" with
+  | Error msg ->
+      assert (String.length msg > 0);
+      assert (String.starts_with ~prefix:"State file not found" msg)
+  | Ok _ -> assert false
+
 (* Run all tests *)
 let () =
   Printf.printf "Running agent tests...\n";
@@ -78,6 +168,10 @@ let () =
   test_parse_action_node ();
   test_parse_branch_node ();
   test_summary_excerpt ();
-  Printf.printf "All tests passed! [[memory:586134]]\n"
+  test_memory_serialization_roundtrip ();
+  test_memory_status_serialization ();
+  test_memory_save_load_file ();
+  test_memory_load_nonexistent ();
+  Printf.printf "All tests passed!\n"
 
 

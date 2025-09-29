@@ -59,4 +59,31 @@ val ensure_default : t -> string -> Yojson.Safe.t -> unit
 val get_answer : t -> string option
 (** Extract the final answer from memory if available *)
 
+(** {1 State Persistence} *)
+
+val to_yojson : t -> Yojson.Safe.t
+(** [to_yojson mem] serializes memory state to JSON.
+
+    The JSON schema includes:
+    - version: Schema version number (currently 1)
+    - goal: The agent's goal string
+    - status: Current execution status (in_progress/completed/failed)
+    - last_result: Last result string or null
+    - iterations: Number of cycles executed
+    - variables: List of key-value pairs *)
+
+val of_yojson : Yojson.Safe.t -> (t, string) result
+(** [of_yojson json] deserializes memory state from JSON.
+    Returns [Ok memory] on success or [Error msg] on failure. *)
+
+val save_to_file : t -> string -> (unit, string) result
+(** [save_to_file mem path] saves memory state to a JSON file.
+    Returns [Ok ()] on success or [Error msg] on failure.
+    The file is written with pretty-printing for readability. *)
+
+val load_from_file : string -> (t, string) result
+(** [load_from_file path] loads memory state from a JSON file.
+    Returns [Ok memory] on success or [Error msg] on failure.
+    Validates the file exists and the JSON schema is correct. *)
+
 

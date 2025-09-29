@@ -29,19 +29,26 @@ let rec loop_cycles t ~goal ~memory cycle =
       Log.debug (fun m -> m "Cycle %d complete, continuing" (cycle + 1));
       loop_cycles t ~goal ~memory:memory_after (succ cycle)))
 
-let run t goal =
-  Log.info (fun m -> m "Running agent with goal: %s" goal);
-  let memory = Memory.init goal in
-  let* final_memory = loop_cycles t ~goal ~memory 0 in
+let run_with_memory t memory =
+  let goal = Memory.goal memory in
+  let start_cycle = Memory.iterations memory in
+  Log.info (fun m -> m "Running agent with goal: %s (starting at cycle %d)" goal start_cycle);
+  let* final_memory = loop_cycles t ~goal ~memory start_cycle in
   match Memory.get_answer final_memory with
   | Some answer ->
       Log.info (fun m -> m "Agent completed with answer");
-      Lwt_result.return answer
+      Lwt_result.return (answer, final_memory)
   | None -> (
       match Memory.last_result final_memory with
       | Some last ->
           Log.debug (fun m -> m "Agent completed with last result");
-          Lwt_result.return last
+          Lwt_result.return (last, final_memory)
       | None ->
           Log.err (fun m -> m "Agent finished without producing an answer");
           Lwt_result.fail "Agent finished without producing an answer")
+
+let run t goal =
+  Log.info (fun m -> m "Running agent with goal: %s" goal);
+  let memory = Memory.init goal in
+  let* answer, _final_memory = run_with_memory t memory in
+  Lwt_result.return answer

@@ -13,4 +13,12 @@ val run : t -> string -> (string, string) result Lwt.t
 (** [run agent goal] runs the agent with the given goal.
     Returns the final answer or an error message. *)
 
+val run_with_memory : t -> Memory.t -> (string * Memory.t, string) result Lwt.t
+(** [run_with_memory agent memory] runs the agent with pre-existing memory state.
+    This allows resuming from a saved checkpoint or continuing a previous execution.
+    Returns a tuple of (final_answer, final_memory) or an error message.
+
+    The agent will continue from the iteration count stored in the memory,
+    useful for resuming interrupted executions or branching from saved states. *)
+
 
