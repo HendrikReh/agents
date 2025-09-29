@@ -1,5 +1,7 @@
 let ( let* ) = Lwt_result.bind
 
+module Log = Logging.Planner
+
 let default_system_prompt =
   {|
 You are an OCaml planning module that outputs structured JSON describing agent workflows.
@@ -93,6 +95,7 @@ type t = {
 }
 
 let create ?(system_prompt = default_system_prompt) ?(temperature = 0.1) client =
+  Log.info (fun m -> m "Creating planner with temperature=%.2f" temperature);
   { client; system_prompt; temperature }
 
 let render_user_prompt ~goal ~memory =
@@ -109,6 +112,7 @@ Return only JSON following the schema.
     (Tools.summary_excerpt memory)
 
 let plan t ~goal ~memory =
+  Log.info (fun m -> m "Generating plan for goal");
   let messages =
     [
       Openai_client.Message.{ role = "system"; content = t.system_prompt };
@@ -116,10 +120,17 @@ let plan t ~goal ~memory =
     ]
   in
   let* raw = Openai_client.chat ~temperature:t.temperature t.client ~messages in
+  Log.debug (fun m -> m "Received raw plan response: %s..." (String.sub raw 0 (min 100 (String.length raw))));
   match extract_json_candidate raw with
-  | Error msg -> Lwt_result.fail msg
+  | Error msg ->
+      Log.err (fun m -> m "Failed to extract JSON from plan: %s" msg);
+      Lwt_result.fail msg
   | Ok json -> (
-      try Lwt_result.return (Nodes.plan_of_yojson json)
+      try
+        let parsed_plan = Nodes.plan_of_yojson json in
+        Log.info (fun m -> m "Successfully parsed plan with %d nodes" (List.length parsed_plan));
+        Lwt_result.return parsed_plan
       with Nodes.Parse_error msg ->
+        Log.err (fun m -> m "Plan schema validation error: %s" msg);
         Lwt_result.fail
           (Printf.sprintf "Planner JSON schema error: %s\nRaw: %s" msg raw))

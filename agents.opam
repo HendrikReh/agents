@@ -5,7 +5,7 @@ description:
   "LangGraph-inspired planner/executor agent implemented in OCaml using Lwt."
 maintainer: ["Maintainer Name <maintainer@example.com>"]
 authors: ["Author Name <author@example.com>"]
-license: "LICENSE"
+license: "MIT"
 tags: ["agent" "planner" "langgraph"]
 homepage: "https://github.com/username/reponame"
 doc: "https://url/to/documentation"
@@ -18,6 +18,8 @@ depends: [
   "uri"
   "yojson"
   "cmdliner"
+  "logs"
+  "fmt"
   "odoc" {with-doc}
 ]
 build: [

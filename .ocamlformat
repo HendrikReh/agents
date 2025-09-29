@@ -21,3 +21,5 @@ sequence-style = terminator
 single-case = compact
 type-decl = sparse
 wrap-comments = true
+
+

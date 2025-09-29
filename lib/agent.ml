@@ -1,31 +1,47 @@
 let ( let* ) = Lwt_result.bind
 
+module Log = Logging.Agent
+
 type t = {
   planner : Planner.t;
   executor : Executor.t;
   max_cycles : int;
 }
 
-let create ?(max_cycles = 4) ~planner ~executor () = { planner; executor; max_cycles }
+let create ?(max_cycles = 4) ~planner ~executor () =
+  Log.info (fun m -> m "Creating agent with max_cycles=%d" max_cycles);
+  { planner; executor; max_cycles }
 
 let rec loop_cycles t ~goal ~memory cycle =
-  if cycle >= t.max_cycles then
+  if cycle >= t.max_cycles then (
+    Log.warn (fun m ->
+        m "Reached max planner cycles (%d) without finishing" t.max_cycles);
     Lwt_result.fail
-      (Printf.sprintf "Reached max planner cycles (%d) without finishing" t.max_cycles)
-  else
+      (Printf.sprintf "Reached max planner cycles (%d) without finishing" t.max_cycles))
+  else (
+    Log.info (fun m -> m "Starting cycle %d/%d" (cycle + 1) t.max_cycles);
     let* plan = Planner.plan t.planner ~goal ~memory in
     let* memory_after, finished = Executor.execute t.executor plan ~memory ~goal in
-    if finished then
-      Lwt_result.return memory_after
-    else
-      loop_cycles t ~goal ~memory:memory_after (succ cycle)
+    if finished then (
+      Log.info (fun m -> m "Agent finished successfully at cycle %d" (cycle + 1));
+      Lwt_result.return memory_after)
+    else (
+      Log.debug (fun m -> m "Cycle %d complete, continuing" (cycle + 1));
+      loop_cycles t ~goal ~memory:memory_after (succ cycle)))
 
 let run t goal =
+  Log.info (fun m -> m "Running agent with goal: %s" goal);
   let memory = Memory.init goal in
   let* final_memory = loop_cycles t ~goal ~memory 0 in
   match Memory.get_answer final_memory with
-  | Some answer -> Lwt_result.return answer
+  | Some answer ->
+      Log.info (fun m -> m "Agent completed with answer");
+      Lwt_result.return answer
   | None -> (
       match Memory.last_result final_memory with
-      | Some last -> Lwt_result.return last
-      | None -> Lwt_result.fail "Agent finished without producing an answer")
+      | Some last ->
+          Log.debug (fun m -> m "Agent completed with last result");
+          Lwt_result.return last
+      | None ->
+          Log.err (fun m -> m "Agent finished without producing an answer");
+          Lwt_result.fail "Agent finished without producing an answer")

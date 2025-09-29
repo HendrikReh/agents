@@ -30,3 +30,7 @@ _opam/
 # merlin
 .merlin
 /backlog.md
+
+
+.DS_Store
+/CLAUDE.md

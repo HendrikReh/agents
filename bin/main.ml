@@ -1,5 +1,30 @@
 open Cmdliner
 
+let setup_logging level =
+  Logs.set_level level;
+  (* Force color output by setting up stderr formatter with style renderer *)
+  let stderr_fmt = Format.err_formatter in
+  Fmt.set_style_renderer stderr_fmt `Ansi_tty;
+
+  let report src level ~over k msgf =
+    let style = match level with
+      | Logs.App -> `None
+      | Logs.Error -> `Red
+      | Logs.Warning -> `Yellow
+      | Logs.Info -> `Blue
+      | Logs.Debug -> `Cyan
+    in
+    let k _ = over (); k () in
+    msgf @@ fun ?header ?tags:_ fmt ->
+    let src_name = Option.value ~default:(Logs.Src.name src) header in
+    Fmt.pf stderr_fmt "%a[%a] %a"
+      Fmt.(styled style string) ""
+      Fmt.(styled style string) src_name
+      Fmt.(styled style string) "";
+    Format.kfprintf k stderr_fmt (fmt ^^ "@.")
+  in
+  Logs.set_reporter { Logs.report }
+
 let strip_quotes s =
   let len = String.length s in
   if len >= 2 then
@@ -65,7 +90,8 @@ let run_agent ~goal ~max_cycles ~model =
       | Ok answer -> Ok answer
       | Error msg -> Error msg
 
-let exec goal max_cycles model =
+let exec goal max_cycles model log_level =
+  setup_logging log_level;
   match run_agent ~goal ~max_cycles ~model with
   | Ok answer ->
       Printf.printf "Final answer: %s\n" answer;
@@ -84,10 +110,32 @@ let model_term =
   let doc = "Override the default OpenAI model (defaults to gpt-5)." in
   Arg.(value & opt (some string) None & info [ "m"; "model" ] ~doc)
 
+let log_level_term =
+  let doc = "Set log level: debug, info, warning, error, or app (default: info)." in
+  let parse_level = function
+    | "debug" -> Ok (Some Logs.Debug)
+    | "info" -> Ok (Some Logs.Info)
+    | "warning" -> Ok (Some Logs.Warning)
+    | "error" -> Ok (Some Logs.Error)
+    | "app" -> Ok (Some Logs.App)
+    | "quiet" -> Ok None
+    | s -> Error (`Msg ("Invalid log level: " ^ s))
+  in
+  let print_level fmt = function
+    | Some Logs.Debug -> Format.fprintf fmt "debug"
+    | Some Logs.Info -> Format.fprintf fmt "info"
+    | Some Logs.Warning -> Format.fprintf fmt "warning"
+    | Some Logs.Error -> Format.fprintf fmt "error"
+    | Some Logs.App -> Format.fprintf fmt "app"
+    | None -> Format.fprintf fmt "quiet"
+  in
+  let converter = Arg.conv (parse_level, print_level) in
+  Arg.(value & opt converter (Some Logs.Info) & info [ "l"; "log-level" ] ~doc)
+
 let cmd =
   let doc = "Planner-style LangGraph-inspired agent PoC in OCaml." in
   let info = Cmd.info "agents" ~doc in
-  let term = Term.(ret (const exec $ goal_term $ max_cycles_term $ model_term)) in
+  let term = Term.(ret (const exec $ goal_term $ max_cycles_term $ model_term $ log_level_term)) in
   Cmd.v info term
 
 let () = exit (Cmd.eval cmd)

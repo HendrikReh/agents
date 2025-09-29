@@ -1,4 +1,4 @@
 (executable
  (public_name agents)
  (name main)
- (libraries agents cmdliner))
+ (libraries agents cmdliner logs logs.fmt logs.lwt))

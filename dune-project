@@ -25,7 +25,9 @@
   cohttp-lwt-unix
   uri
   yojson
-  cmdliner)
+  cmdliner
+  logs
+  fmt)
  (tags
   ("agent" "planner" "langgraph")))
 
