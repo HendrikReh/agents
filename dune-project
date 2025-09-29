@@ -1,5 +1,5 @@
 (lang dune 3.20)
-
+(version 0.0.3)
 (name agents)
 
 (generate_opam_files true)

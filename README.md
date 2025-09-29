@@ -122,7 +122,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ---
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Version-0.1.0--alpha-red.svg" alt="Version">
+  <img src="https://img.shields.io/badge/Version-0.0.3-red.svg" alt="Version">
   <img src="https://img.shields.io/badge/Stage-Experimental-orange.svg" alt="Experimental">
   <img src="https://img.shields.io/badge/Made%20with-OCaml-orange.svg" alt="Made with OCaml">
   <img src="https://img.shields.io/badge/Powered%20by-OpenAI-412991.svg" alt="Powered by OpenAI">
