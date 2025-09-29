@@ -1,0 +1,61 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        ocaml-compiler: [5.1.x, 5.2.x]
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up OCaml
+      uses: ocaml/setup-ocaml@v3
+      with:
+        ocaml-compiler: ${{ matrix.ocaml-compiler }}
+        dune-cache: true
+    
+    - name: Install dependencies
+      run: opam install . --deps-only --with-test
+    
+    - name: Build
+      run: opam exec -- dune build
+    
+    - name: Run tests
+      run: opam exec -- dune runtest
+    
+    - name: Check formatting
+      run: |
+        opam install ocamlformat.0.26.2 --yes
+        opam exec -- dune fmt --display=quiet
+        git diff --exit-code
+      if: matrix.os == 'ubuntu-latest' && matrix.ocaml-compiler == '5.2.x'
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up OCaml
+      uses: ocaml/setup-ocaml@v3
+      with:
+        ocaml-compiler: 5.2.x
+    
+    - name: Install dependencies
+      run: opam install . --deps-only --with-doc
+    
+    - name: Build documentation
+      run: opam exec -- dune build @doc
+    
+    - name: Check for build warnings
+      run: |
+        opam exec -- dune build --display=short 2>&1 | tee build.log
+        ! grep -E "(Warning|Error)" build.log

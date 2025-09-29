@@ -1,0 +1,31 @@
+# Build artifacts
+_build/
+_opam/
+
+# Environment files  
+.env
+.env.local
+
+# Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OCaml specific
+*.annot
+*.cmo
+*.cma
+*.cmi
+*.a
+*.o
+*.cmx
+*.cmxs
+*.cmxa
+
+# opam
+*.install
+
+# merlin
+.merlin
