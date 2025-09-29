@@ -1,12 +1,11 @@
 # OCaml Agents (PoC)
 
-<!-- Replace 'username' with your GitHub username in all badge URLs below -->
 [![OCaml](https://img.shields.io/badge/OCaml-%3E%3D%205.1-orange.svg)](https://ocaml.org)
-[![Status](https://img.shields.io/badge/Status-Proof%20of%20Concept-yellow.svg)](https://github.com/username/agents)
-[![Build Status](https://img.shields.io/github/actions/workflow/status/username/agents/ci.yml?branch=main)](https://github.com/username/agents/actions)
-[![License](https://img.shields.io/github/license/username/agents)](LICENSE)
+[![Status](https://img.shields.io/badge/Status-Proof%20of%20Concept-yellow.svg)](https://github.com/HendrikReh/agents)
+[![Build Status](https://img.shields.io/github/actions/workflow/status/HendrikReh/agents/ci.yml?branch=main)](https://github.com/HendrikReh/agents/actions)
+[![License](https://img.shields.io/github/license/HendrikReh/agents)](LICENSE)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](GUIDELINES.md)
-[![Maintenance](https://img.shields.io/badge/Maintained%3F-yes-green.svg)](https://github.com/username/agents/graphs/commit-activity)
+[![Maintenance](https://img.shields.io/badge/Maintained%3F-yes-green.svg)](https://github.com/HendrikReh/agents/graphs/commit-activity)
 
 A LangGraph-inspired planner/executor agent system implemented in OCaml using Lwt for asynchronous execution.
 
@@ -45,7 +44,7 @@ A LangGraph-inspired planner/executor agent system implemented in OCaml using Lw
 
 1. Clone the repository:
 ```bash
-git clone <repository-url>
+git clone https://github.com/HendrikReh/agents.git
 cd agents
 ```
 
@@ -127,7 +126,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
   <img src="https://img.shields.io/badge/Stage-Experimental-orange.svg" alt="Experimental">
   <img src="https://img.shields.io/badge/Made%20with-OCaml-orange.svg" alt="Made with OCaml">
   <img src="https://img.shields.io/badge/Powered%20by-OpenAI-412991.svg" alt="Powered by OpenAI">
-  <img src="https://img.shields.io/github/last-commit/username/agents" alt="Last Commit">
-  <img src="https://img.shields.io/github/issues/username/agents" alt="Issues">
-  <img src="https://img.shields.io/github/stars/username/agents?style=social" alt="Stars">
+  <img src="https://img.shields.io/github/last-commit/HendrikReh/agents" alt="Last Commit">
+  <img src="https://img.shields.io/github/issues/HendrikReh/agents" alt="Issues">
+  <img src="https://img.shields.io/github/stars/HendrikReh/agents?style=social" alt="Stars">
 </p>
