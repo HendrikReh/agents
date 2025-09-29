@@ -2,6 +2,7 @@
 
 <!-- Replace 'username' with your GitHub username in all badge URLs below -->
 [![OCaml](https://img.shields.io/badge/OCaml-%3E%3D%205.1-orange.svg)](https://ocaml.org)
+[![Status](https://img.shields.io/badge/Status-Proof%20of%20Concept-yellow.svg)](https://github.com/username/agents)
 [![Build Status](https://img.shields.io/github/actions/workflow/status/username/agents/ci.yml?branch=main)](https://github.com/username/agents/actions)
 [![License](https://img.shields.io/github/license/username/agents)](LICENSE)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](GUIDELINES.md)
@@ -21,6 +22,7 @@ A LangGraph-inspired planner/executor agent system implemented in OCaml using Lw
   <img src="https://img.shields.io/badge/Dependencies-Lwt%20%7C%20Yojson%20%7C%20Cohttp-blue.svg" alt="Dependencies">
   <img src="https://img.shields.io/badge/Platform-Linux%20%7C%20macOS%20%7C%20Windows-lightgrey.svg" alt="Platform">
   <img src="https://img.shields.io/badge/Code%20Style-OCamlformat-blueviolet.svg" alt="Code Style">
+  <img src="https://img.shields.io/badge/LangGraph-Inspired-ff69b4.svg" alt="LangGraph Inspired">
 </p>
 
 ## Features
@@ -112,7 +114,7 @@ dune build --watch
 
 ## Contributing
 
-Please see [AGENTS.md](AGENTS.md) for detailed contribution guidelines.
+Please see [GUIDELINES.md](GUIDELINES.md) for detailed contribution guidelines.
 
 ## License
 
@@ -121,6 +123,8 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ---
 
 <p align="center">
+  <img src="https://img.shields.io/badge/Version-0.1.0--alpha-red.svg" alt="Version">
+  <img src="https://img.shields.io/badge/Stage-Experimental-orange.svg" alt="Experimental">
   <img src="https://img.shields.io/badge/Made%20with-OCaml-orange.svg" alt="Made with OCaml">
   <img src="https://img.shields.io/badge/Powered%20by-OpenAI-412991.svg" alt="Powered by OpenAI">
   <img src="https://img.shields.io/github/last-commit/username/agents" alt="Last Commit">
