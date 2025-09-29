@@ -4,7 +4,7 @@
 [![Status](https://img.shields.io/badge/Status-Proof%20of%20Concept-yellow.svg)](https://github.com/HendrikReh/agents)
 [![Build Status](https://img.shields.io/github/actions/workflow/status/HendrikReh/agents/ci.yml?branch=main)](https://github.com/HendrikReh/agents/actions)
 [![License](https://img.shields.io/github/license/HendrikReh/agents)](LICENSE)
-[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](GUIDELINES.md)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](docs/GUIDELINES.md)
 [![Maintenance](https://img.shields.io/badge/Maintained%3F-yes-green.svg)](https://github.com/HendrikReh/agents/graphs/commit-activity)
 
 A LangGraph-inspired planner/executor agent system implemented in OCaml using Lwt for asynchronous execution.
@@ -113,7 +113,7 @@ dune build --watch
 
 ## Contributing
 
-Please see [GUIDELINES.md](GUIDELINES.md) for detailed contribution guidelines.
+Please see [GUIDELINES.md](docs/GUIDELINES.md) for detailed contribution guidelines.
 
 ## License
 
