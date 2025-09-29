@@ -1,4 +1,4 @@
-# OCaml Agents
+# OCaml Agents (PoC)
 
 <!-- Replace 'username' with your GitHub username in all badge URLs below -->
 [![OCaml](https://img.shields.io/badge/OCaml-%3E%3D%205.1-orange.svg)](https://ocaml.org)
