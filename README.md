@@ -68,7 +68,7 @@ echo "OPENAI_API_KEY=your-api-key-here" > .env
 Run the agent with a goal:
 
 ```bash
-dune exec bin/agents.exe -- --goal "Research the latest developments in quantum computing"
+dune exec agents -- --goal "Research the latest developments in quantum computing"
 ```
 
 ### Command Line Options
