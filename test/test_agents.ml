@@ -19,6 +19,11 @@ let run_lwt_result_or_fail promise =
   | Ok value -> value
   | Error msg -> Alcotest.fail msg
 
+let run_lwt_result_expect_error promise =
+  match Lwt_main.run promise with
+  | Ok _ -> Alcotest.fail "Expected operation to fail"
+  | Error msg -> msg
+
 let string_contains ~needle haystack =
   let needle_len = String.length needle in
   let haystack_len = String.length haystack in
@@ -31,6 +36,10 @@ let string_contains ~needle haystack =
       scan (idx + 1)
   in
   scan 0
+
+let write_file path content =
+  let oc = open_out path in
+  Fun.protect ~finally:(fun () -> close_out_noerr oc) (fun () -> output_string oc content)
 
 let check (type a) (testable : a Alcotest.testable) msg expected actual =
   let module T = (val testable : Alcotest.TESTABLE with type t = a) in
@@ -142,6 +151,44 @@ let test_memory_load_nonexistent () =
       check Alcotest.bool "message" true (String.starts_with ~prefix:"State file not found" msg)
   | Ok _ -> Alcotest.fail "Expected load to fail"
 
+let test_memory_load_corrupted_json () =
+  let temp_file = Filename.temp_file "agent_test" ".json" in
+  Fun.protect
+    ~finally:(fun () -> if Sys.file_exists temp_file then Sys.remove temp_file)
+    (fun () ->
+      write_file temp_file "not json";
+      match Memory.load_from_file temp_file with
+      | Error msg ->
+          check Alcotest.bool
+            "corrupted json message"
+            true
+            (string_contains ~needle:"Failed to parse state file" msg)
+      | Ok _ -> Alcotest.fail "Expected corrupted load to fail")
+
+let test_memory_load_bad_version () =
+  let temp_file = Filename.temp_file "agent_test" ".json" in
+  Fun.protect
+    ~finally:(fun () -> if Sys.file_exists temp_file then Sys.remove temp_file)
+    (fun () ->
+      write_file temp_file
+        "{\"version\": 2, \"goal\": \"Goal\", \"status\": {\"type\": \"in_progress\"}, \"last_result\": null, \"iterations\": 0, \"variables\": []}";
+      match Memory.load_from_file temp_file with
+      | Error msg ->
+          check Alcotest.bool "bad version message" true (string_contains ~needle:"Unsupported schema version" msg)
+      | Ok _ -> Alcotest.fail "Expected unsupported version to fail")
+
+let test_memory_load_bad_status () =
+  let temp_file = Filename.temp_file "agent_test" ".json" in
+  Fun.protect
+    ~finally:(fun () -> if Sys.file_exists temp_file then Sys.remove temp_file)
+    (fun () ->
+      write_file temp_file
+        "{\"version\": 1, \"goal\": \"Goal\", \"status\": {\"type\": \"unknown\"}, \"last_result\": null, \"iterations\": 0, \"variables\": []}";
+      match Memory.load_from_file temp_file with
+      | Error msg ->
+          check Alcotest.bool "bad status message" true (string_contains ~needle:"Unknown status type" msg)
+      | Ok _ -> Alcotest.fail "Expected bad status to fail")
+
 (* Node parsing tests *)
 
 let test_parse_action_node () =
@@ -230,6 +277,75 @@ let test_executor_llm_flow () =
   check (Alcotest.option Alcotest.string) "final answer" (Some "Completed") (Memory.get_answer updated_memory);
   check Alcotest.int "messages sent" 2 (List.length !responses)
 
+let test_executor_loop_max_iterations () =
+  let call_count = ref 0 in
+  let fake_chat ?temperature:_ ?model:_ _client ~messages:_ =
+    incr call_count;
+    Lwt.return_ok (Printf.sprintf "iteration %d" !call_count)
+  in
+  let client = Openai_client.create ~api_key:"test" () in
+  let executor = Executor.create ~chat:fake_chat client in
+  let memory = Memory.init "Loop goal" in
+  let loop_body =
+    Nodes.Action
+      {
+        id = "loop_action";
+        label = "Loop action";
+        tool = None;
+        prompt = "Perform loop step";
+        save_as = Some "loop_result";
+      }
+  in
+  let plan =
+    [
+      Nodes.Loop
+        {
+          id = "loop";
+          condition = Nodes.Always;
+          body = [ loop_body ];
+          max_iterations = Some 2;
+        };
+      Nodes.Finish { id = "finish"; summary = Some "Loop done" };
+    ]
+  in
+  let updated_memory, finished =
+    run_lwt_result_or_fail (Executor.execute executor plan ~memory ~goal:"Loop goal")
+  in
+  check Alcotest.bool "finished" true finished;
+  check Alcotest.int "loop iterations" 2 !call_count;
+  (match Memory.get_variable updated_memory "loop_result" with
+  | Some (`String v) -> check Alcotest.string "final loop result" "iteration 2" v
+  | _ -> Alcotest.fail "Expected loop_result variable");
+  check
+    (Alcotest.option Alcotest.string)
+    "final answer"
+    (Some "Loop done")
+    (Memory.get_answer updated_memory)
+
+let test_executor_unsupported_tool () =
+  let fake_chat ?temperature:_ ?model:_ _client ~messages:_ =
+    Alcotest.fail "Chat should not be invoked for unsupported tool"
+  in
+  let client = Openai_client.create ~api_key:"test" () in
+  let executor = Executor.create ~chat:fake_chat client in
+  let memory = Memory.init "Unsupported tool" in
+  let plan =
+    [
+      Nodes.Action
+        {
+          id = "unsupported";
+          label = "Unsupported";
+          tool = Some "email";
+          prompt = "Do something";
+          save_as = None;
+        };
+    ]
+  in
+  let error =
+    run_lwt_result_expect_error (Executor.execute executor plan ~memory ~goal:"Unsupported tool")
+  in
+  check Alcotest.bool "unsupported tool message" true (string_contains ~needle:"Unsupported tool" error)
+
 (* Planner tests *)
 
 let test_summary_excerpt () =
@@ -260,6 +376,31 @@ let test_planner_extract_json () =
   (match Planner.extract_json_candidate invalid with
   | Error _ -> ()
   | Ok _ -> Alcotest.fail "Expected extraction to fail")
+
+let test_planner_invalid_json_response () =
+  let fake_chat ?temperature:_ ?model:_ _client ~messages:_ = Lwt.return_ok "no json here" in
+  let client = Openai_client.create ~api_key:"test" () in
+  let planner = Planner.create ~chat:fake_chat client in
+  let memory = Memory.init "Invalid planner" in
+  let error = run_lwt_result_expect_error (Planner.plan planner ~goal:"Invalid" ~memory) in
+  check Alcotest.bool
+    "missing json error"
+    true
+    (string_contains ~needle:"did not include JSON object" error)
+
+let test_planner_schema_error () =
+  let fake_chat ?temperature:_ ?model:_ _client ~messages:_ =
+    Lwt.return_ok "{\"plan\": [{\"id\": \"step1\", \"type\": \"unknown\"}]}"
+  in
+  let client = Openai_client.create ~api_key:"test" () in
+  let planner = Planner.create ~chat:fake_chat client in
+  let memory = Memory.init "Schema error" in
+  let error = run_lwt_result_expect_error (Planner.plan planner ~goal:"Schema" ~memory) in
+  check Alcotest.bool
+    "schema error reported"
+    true
+    (string_contains ~needle:"Planner JSON schema error" error);
+  check Alcotest.bool "mentions unknown" true (string_contains ~needle:"unknown" error)
 
 let test_planner_plan_integration () =
   let captured_messages = ref [] in
@@ -298,6 +439,9 @@ let raw_suites =
         quick_case "status serialization" test_memory_status_serialization;
         quick_case "save/load file" test_memory_save_load_file;
         quick_case "load nonexistent" test_memory_load_nonexistent;
+        quick_case "load corrupted json" test_memory_load_corrupted_json;
+        quick_case "load bad version" test_memory_load_bad_version;
+        quick_case "load bad status" test_memory_load_bad_status;
       ] );
     ( "Nodes",
       [
@@ -308,12 +452,16 @@ let raw_suites =
       [
         quick_case "conditions" test_executor_condition_evaluation;
         quick_case "llm flow" test_executor_llm_flow;
+        quick_case "loop respects max iterations" test_executor_loop_max_iterations;
+        quick_case "unsupported tool" test_executor_unsupported_tool;
       ] );
     ( "Planner",
       [
         quick_case "summary excerpt" test_summary_excerpt;
         quick_case "strip code fence" test_planner_strip_code_fence;
         quick_case "extract json" test_planner_extract_json;
+        quick_case "invalid json response" test_planner_invalid_json_response;
+        quick_case "schema error" test_planner_schema_error;
         quick_case "plan integration" test_planner_plan_integration;
       ] );
   ]
