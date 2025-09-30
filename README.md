@@ -97,7 +97,7 @@ The system consists of several key modules:
 - `ALCOTEST_QUICK_TESTS=1 dune runtest` – run only tests marked as quick (current default).
 - `ALCOTEST_VERBOSE=1 dune runtest` – stream captured output to the terminal for debugging.
 
-Tests stub all OpenAI calls, so no network access or API keys are needed.
+The suite stubs every OpenAI call, so no network access or API keys are needed. Recent additions exercise planner schema failures, executor loop bounds/unsupported tools, and memory persistence error handling to guard common edge cases.
 
 ### Code Formatting
 

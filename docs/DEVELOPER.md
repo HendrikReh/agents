@@ -56,6 +56,12 @@ let my_function () =
 
 3. Register the module in `lib/dune` if needed.
 
+## Testing
+
+- `dune runtest` runs the entire Alcotest suite; all cases are deterministic and mock the OpenAI client.
+- Negative-path coverage includes planner JSON/schema errors, executor loop limits/unsupported tools, and memory deserialization failures.
+- Use `ALCOTEST_VERBOSE=1` while iterating on tests to stream captured output.
+
 ## OpenAI API
 
 ### Model Support
