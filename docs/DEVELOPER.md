@@ -59,8 +59,28 @@ let my_function () =
 ## Testing
 
 - `dune runtest` runs the entire Alcotest suite; all cases are deterministic and mock the OpenAI client.
-- Negative-path coverage includes planner JSON/schema errors, executor loop limits/unsupported tools, and memory deserialization failures.
+- Negative-path coverage includes planner JSON/schema errors (missing plan nodes, bad types), executor loop limits/unsupported tools, and memory deserialization failures.
 - Use `ALCOTEST_VERBOSE=1` while iterating on tests to stream captured output.
+
+### Local CI with `act`
+
+You can replay the GitHub Actions matrix locally:
+
+1. Install [`act`](https://github.com/nektos/act) (e.g. `brew install act`).
+2. On Apple Silicon, add a default config `~/.actrc` so the runner pulls x86_64 images:
+   ```
+   --container-architecture linux/amd64
+   -P ubuntu-latest=catthehacker/ubuntu:act-latest
+   -P macos-latest=catthehacker/ubuntu:act-latest
+   ```
+3. Run the workflow slice you care about, e.g. the linux/OCaml 5.2 job:
+   ```bash
+   act push -j build --matrix '{"os":"ubuntu-latest","ocaml-compiler":"5.2.x"}' \
+       --container-architecture linux/amd64
+   ```
+   Repeat with `"5.1.x"` for the other compiler variant. The macOS matrix is large/slow; map it to the Ubuntu image (as above) or run it on GitHub’s runners instead.
+
+Common troubleshooting: if you see `ReferenceError: File is not defined`, it means the container architecture wasn’t forced to `linux/amd64`. Adjust the config or pass `--container-architecture linux/amd64` explicitly.
 
 ## OpenAI API
 

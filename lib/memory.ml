@@ -80,7 +80,8 @@ let ensure_default mem key value =
 let get_answer mem =
   match mem.status with
   | Completed answer -> Some answer
-  | _ -> ( match get_variable mem "final_answer" with Some (`String s) -> Some s | _ -> None )
+  | _ -> (
+    match get_variable mem "final_answer" with Some (`String s) -> Some s | _ -> None )
 
 (* Serialization for state persistence *)
 
@@ -149,7 +150,8 @@ let of_yojson json =
           variables_json;
         Ok { goal; variables; status; last_result; iterations }
   with
-  | Yojson.Safe.Util.Type_error (msg, _) -> Error (Printf.sprintf "Failed to parse memory: %s" msg)
+  | Yojson.Safe.Util.Type_error (msg, _) ->
+    Error (Printf.sprintf "Failed to parse memory: %s" msg)
   | e -> Error (Printf.sprintf "Unexpected error: %s" (Printexc.to_string e))
 
 let save_to_file mem path =

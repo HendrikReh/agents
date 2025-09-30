@@ -69,17 +69,16 @@ let extract_json_candidate text =
     match (!first_brace, !last_brace) with
     | Some start_idx, Some end_idx when end_idx > start_idx -> (
       let candidate = String.sub trimmed start_idx (end_idx - start_idx + 1) in
-      try Ok (Yojson.Safe.from_string candidate) with Yojson.Json_error msg ->
+      try Ok (Yojson.Safe.from_string candidate)
+      with Yojson.Json_error msg ->
         Error
           (Printf.sprintf
-             "Planner response did not contain valid JSON (parse error: %s).\nRaw: %s"
-             msg text )
-    )
+             "Planner response did not contain valid JSON (parse error: %s).\nRaw: %s" msg
+             text ) )
     | _ ->
       Error
-        (Printf.sprintf
-           "Planner response did not include JSON object. Raw response: %s" text )
-  )
+        (Printf.sprintf "Planner response did not include JSON object. Raw response: %s"
+           text ) )
 
 module type S = sig
   val plan : goal:string -> memory:Memory.t -> (Nodes.plan, string) result Lwt.t
@@ -116,7 +115,8 @@ Shared memory snapshot:
 Design a plan leveraging available tools. Prefer short, actionable steps.
 Return only JSON following the schema.
 |}
-    goal (Tools.summary_excerpt memory)
+    goal
+    (Tools.summary_excerpt memory)
 
 let plan t ~goal ~memory =
   Log.info (fun m -> m "Generating plan for goal");
@@ -142,5 +142,4 @@ let plan t ~goal ~memory =
       Lwt_result.return parsed_plan
     with Nodes.Parse_error msg ->
       Log.err (fun m -> m "Plan schema validation error: %s" msg);
-      Lwt_result.fail (Printf.sprintf "Planner JSON schema error: %s\nRaw: %s" msg raw)
-  )
+      Lwt_result.fail (Printf.sprintf "Planner JSON schema error: %s\nRaw: %s" msg raw) )

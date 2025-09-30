@@ -17,21 +17,17 @@ let rec loop_cycles t ~goal ~memory cycle =
     Log.warn (fun m ->
         m "Reached max planner cycles (%d) without finishing" t.max_cycles );
     Lwt_result.fail
-      (Printf.sprintf "Reached max planner cycles (%d) without finishing" t.max_cycles)
-  )
+      (Printf.sprintf "Reached max planner cycles (%d) without finishing" t.max_cycles) )
   else (
     Log.info (fun m -> m "Starting cycle %d/%d" (cycle + 1) t.max_cycles);
     let* plan = Planner.plan t.planner ~goal ~memory in
     let* memory_after, finished = Executor.execute t.executor plan ~memory ~goal in
     if finished then (
       Log.info (fun m -> m "Agent finished successfully at cycle %d" (cycle + 1));
-      Lwt_result.return memory_after
-    )
+      Lwt_result.return memory_after )
     else (
       Log.debug (fun m -> m "Cycle %d complete, continuing" (cycle + 1));
-      loop_cycles t ~goal ~memory:memory_after (succ cycle)
-    )
-  )
+      loop_cycles t ~goal ~memory:memory_after (succ cycle) ) )
 
 let run_with_memory t memory =
   let goal = Memory.goal memory in
@@ -50,8 +46,7 @@ let run_with_memory t memory =
       Lwt_result.return (last, final_memory)
     | None ->
       Log.err (fun m -> m "Agent finished without producing an answer");
-      Lwt_result.fail "Agent finished without producing an answer"
-  )
+      Lwt_result.fail "Agent finished without producing an answer" )
 
 let run t goal =
   Log.info (fun m -> m "Running agent with goal: %s" goal);

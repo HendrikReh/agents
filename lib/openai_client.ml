@@ -1,5 +1,4 @@
 open Lwt.Infix
-
 module Log = Logging.OpenAI
 
 module Message = struct
@@ -45,12 +44,10 @@ let handle_response (resp, body) =
   let code = Cohttp.Code.code_of_status status in
   if Cohttp.Code.is_success code then (
     Log.debug (fun m -> m "OpenAI request successful (status=%d)" code);
-    Lwt.return_ok body_str
-  )
+    Lwt.return_ok body_str )
   else (
     Log.err (fun m -> m "OpenAI request failed (%d): %s" code body_str);
-    Lwt.return_error (Printf.sprintf "OpenAI request failed (%d): %s" code body_str)
-  )
+    Lwt.return_error (Printf.sprintf "OpenAI request failed (%d): %s" code body_str) )
 
 let chat ?(temperature = 0.2) ?(model = None) t ~messages =
   let model_name = Option.value ~default:t.default_model model in
@@ -96,13 +93,12 @@ let chat ?(temperature = 0.2) ?(model = None) t ~messages =
         Lwt.return_ok content
     with Yojson.Json_error msg ->
       Log.err (fun m -> m "Failed to parse OpenAI JSON: %s" msg);
-      Lwt.return_error ("Failed to parse OpenAI JSON: " ^ msg)
-  )
+      Lwt.return_error ("Failed to parse OpenAI JSON: " ^ msg) )
 
 let response_json ?temperature ?model t ~messages =
   chat ?temperature ?model t ~messages >>= function
   | Error _ as err -> Lwt.return err
   | Ok text -> (
     try Lwt.return_ok (Yojson.Safe.from_string text)
-    with Yojson.Json_error msg -> Lwt.return_error ("Failed to decode JSON payload: " ^ msg)
-  )
+    with Yojson.Json_error msg ->
+      Lwt.return_error ("Failed to decode JSON payload: " ^ msg) )

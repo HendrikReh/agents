@@ -9,6 +9,8 @@ on:
 jobs:
   build:
     runs-on: ${{ matrix.os }}
+    env:
+      UNDICI_NO_GLOBAL: 'true'
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest]
@@ -17,12 +19,17 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     
+    - name: Set up Node
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+
     - name: Set up OCaml
       uses: ocaml/setup-ocaml@v3
       with:
         ocaml-compiler: ${{ matrix.ocaml-compiler }}
         dune-cache: true
-    
+
     - name: Install dependencies
       run: opam install . --deps-only --with-test
     
@@ -41,13 +48,22 @@ jobs:
 
   lint:
     runs-on: ubuntu-latest
+    env:
+      UNDICI_NO_GLOBAL: 'true'
     steps:
     - uses: actions/checkout@v4
+
+    - name: Set up Node
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
 
     - name: Set up OCaml
       uses: ocaml/setup-ocaml@v3
       with:
         ocaml-compiler: 5.2.x
+      env:
+        UNDICI_NO_GLOBAL: 'true'
 
     - name: Install dependencies
       run: opam install . --deps-only --with-test

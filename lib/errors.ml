@@ -21,13 +21,11 @@ type agent_error =
 let to_string = function
   | Planning_error msg -> Printf.sprintf "Planning error: %s" msg
   | Execution_error msg -> Printf.sprintf "Execution error: %s" msg
-  | Tool_error { tool; message } ->
-    Printf.sprintf "Tool '%s' error: %s" tool message
-  | Max_iterations_exceeded { limit; goal } -> 
+  | Tool_error { tool; message } -> Printf.sprintf "Tool '%s' error: %s" tool message
+  | Max_iterations_exceeded { limit; goal } ->
     Printf.sprintf "Max iterations (%d) exceeded for goal: %s" limit goal
   | No_answer_produced -> "Agent finished without producing an answer"
-  | Api_error { code; message } ->
-    Printf.sprintf "API error %d: %s" code message
+  | Api_error { code; message } -> Printf.sprintf "API error %d: %s" code message
   | Parse_error msg -> Printf.sprintf "Parse error: %s" msg
 
 (** Result type alias for convenience *)

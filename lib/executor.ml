@@ -14,8 +14,7 @@ let rec evaluate_condition memory = function
     match Memory.get_variable memory key with
     | Some (`String stored) -> String.equal stored value
     | Some json -> String.equal (Yojson.Safe.to_string json) value
-    | None -> false
-  )
+    | None -> false )
   | Nodes.Not condition -> not (evaluate_condition memory condition)
 
 let normalise_save_key action =
@@ -119,18 +118,15 @@ and run_loop t ~goal ~memory loop =
   let rec apply iteration memory_acc =
     if not (evaluate_condition memory_acc loop.Nodes.condition) then (
       Log.debug (fun m -> m "Loop condition false at iteration %d" iteration);
-      Lwt_result.return (memory_acc, false)
-    )
+      Lwt_result.return (memory_acc, false) )
     else if iteration >= max_iterations then (
       Log.debug (fun m -> m "Loop reached max_iterations at %d" iteration);
-      Lwt_result.return (memory_acc, false)
-    )
+      Lwt_result.return (memory_acc, false) )
     else (
       Log.debug (fun m -> m "Loop iteration %d/%d" (iteration + 1) max_iterations);
       let* memory_body, finished = run_nodes t ~goal ~memory:memory_acc loop.Nodes.body in
       if finished then Lwt_result.return (memory_body, true)
-      else apply (succ iteration) memory_body
-    )
+      else apply (succ iteration) memory_body )
   in
   apply 0 memory
 
@@ -147,8 +143,7 @@ and run_finish ~memory finish =
       Memory.mark_completed memory result
     | _ ->
       Log.debug (fun m -> m "Marking completed with no result");
-      Memory.mark_completed memory "<no result>"
-  ) );
+      Memory.mark_completed memory "<no result>" ) );
   Lwt_result.return (memory, true)
 
 let execute t plan ~memory ~goal =

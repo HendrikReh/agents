@@ -103,7 +103,8 @@ let test_memory_status_serialization () =
   let mem = Memory.init "Test status" in
   let json_in_progress = Memory.to_yojson mem in
   ( match Memory.of_yojson json_in_progress with
-  | Ok restored -> check status_testable "in_progress" Memory.In_progress (Memory.status restored)
+  | Ok restored ->
+    check status_testable "in_progress" Memory.In_progress (Memory.status restored)
   | Error _ -> Alcotest.fail "Deserialization should succeed" );
   Memory.mark_completed mem "Test answer";
   let json_completed = Memory.to_yojson mem in
@@ -136,17 +137,18 @@ let test_memory_save_load_file () =
       | Error msg -> Alcotest.failf "Save failed: %s" msg );
       match Memory.load_from_file temp_file with
       | Error msg -> Alcotest.failf "Load failed: %s" msg
-      | Ok restored ->
+      | Ok restored -> (
         check Alcotest.string "goal" "File persistence test" (Memory.goal restored);
         check Alcotest.int "iterations" 1 (Memory.iterations restored);
-        (match Memory.get_variable restored "saved_var" with
+        match Memory.get_variable restored "saved_var" with
         | Some (`String v) -> check Alcotest.string "saved_var" "saved_value" v
-        | _ -> Alcotest.fail "Expected saved_var") )
+        | _ -> Alcotest.fail "Expected saved_var" ) )
 
 let test_memory_load_nonexistent () =
   match Memory.load_from_file "/nonexistent/path/to/file.json" with
   | Error msg ->
-    check Alcotest.bool "message" true (String.starts_with ~prefix:"State file not found" msg)
+    check Alcotest.bool "message" true
+      (String.starts_with ~prefix:"State file not found" msg)
   | Ok _ -> Alcotest.fail "Expected load to fail"
 
 let test_memory_load_corrupted_json () =
@@ -167,7 +169,8 @@ let test_memory_load_bad_version () =
     ~finally:(fun () -> if Sys.file_exists temp_file then Sys.remove temp_file)
     (fun () ->
       write_file temp_file
-        "{\"version\": 2, \"goal\": \"Goal\", \"status\": {\"type\": \"in_progress\"}, \"last_result\": null, \"iterations\": 0, \"variables\": []}";
+        "{\"version\": 2, \"goal\": \"Goal\", \"status\": {\"type\": \"in_progress\"}, \
+         \"last_result\": null, \"iterations\": 0, \"variables\": []}";
       match Memory.load_from_file temp_file with
       | Error msg ->
         check Alcotest.bool "bad version message" true
@@ -180,12 +183,27 @@ let test_memory_load_bad_status () =
     ~finally:(fun () -> if Sys.file_exists temp_file then Sys.remove temp_file)
     (fun () ->
       write_file temp_file
-        "{\"version\": 1, \"goal\": \"Goal\", \"status\": {\"type\": \"unknown\"}, \"last_result\": null, \"iterations\": 0, \"variables\": []}";
+        "{\"version\": 1, \"goal\": \"Goal\", \"status\": {\"type\": \"unknown\"}, \
+         \"last_result\": null, \"iterations\": 0, \"variables\": []}";
       match Memory.load_from_file temp_file with
       | Error msg ->
         check Alcotest.bool "bad status message" true
           (string_contains ~needle:"Unknown status type" msg)
       | Ok _ -> Alcotest.fail "Expected bad status to fail" )
+
+let test_memory_load_bad_iterations () =
+  let temp_file = Filename.temp_file "agent_test" ".json" in
+  Fun.protect
+    ~finally:(fun () -> if Sys.file_exists temp_file then Sys.remove temp_file)
+    (fun () ->
+      write_file temp_file
+        "{\"version\": 1, \"goal\": \"Goal\", \"status\": {\"type\": \"in_progress\"}, \
+         \"last_result\": null, \"iterations\": \"oops\", \"variables\": []}";
+      match Memory.load_from_file temp_file with
+      | Error msg ->
+        check Alcotest.bool "bad iterations message" true
+          (string_contains ~needle:"Failed to parse memory" msg)
+      | Ok _ -> Alcotest.fail "Expected iterations type error" )
 
 (* Node parsing tests *)
 
@@ -283,7 +301,8 @@ let test_executor_llm_flow () =
   | _ -> Alcotest.fail "Expected action result" );
   check
     (Alcotest.option Alcotest.string)
-    "final answer" (Some "Completed") (Memory.get_answer updated_memory);
+    "final answer" (Some "Completed")
+    (Memory.get_answer updated_memory);
   check Alcotest.int "messages sent" 2 (List.length !responses)
 
 let test_executor_loop_max_iterations () =
@@ -327,7 +346,49 @@ let test_executor_loop_max_iterations () =
   | _ -> Alcotest.fail "Expected loop_result variable" );
   check
     (Alcotest.option Alcotest.string)
-    "final answer" (Some "Loop done") (Memory.get_answer updated_memory)
+    "final answer" (Some "Loop done")
+    (Memory.get_answer updated_memory)
+
+let test_executor_loop_condition_short_circuit () =
+  let call_count = ref 0 in
+  let fake_chat ?temperature:_ ?model:_ _client ~messages:_ =
+    incr call_count;
+    Lwt.return_ok "should not run"
+  in
+  let client = Openai_client.create ~api_key:"test" () in
+  let executor = Executor.create ~chat:fake_chat client in
+  let memory = Memory.init "Loop skips" in
+  let loop =
+    Nodes.Loop
+      {
+        id = "loop";
+        condition = Nodes.Has_variable "ready";
+        body =
+          [
+            Nodes.Action
+              {
+                id = "loop_action";
+                label = "Loop action";
+                tool = Some "llm";
+                prompt = "Do work";
+                save_as = Some "loop_result";
+              };
+          ];
+        max_iterations = Some 3;
+      }
+  in
+  let plan = [ loop; Nodes.Finish { id = "finish"; summary = Some "No iterations" } ] in
+  let updated_memory, finished =
+    run_lwt_result_or_fail (Executor.execute executor plan ~memory ~goal:"Loop skips")
+  in
+  check Alcotest.bool "finished" true finished;
+  check Alcotest.int "loop iterations" 0 !call_count;
+  check Alcotest.bool "loop result missing" true
+    (Option.is_none (Memory.get_variable updated_memory "loop_result"));
+  check
+    (Alcotest.option Alcotest.string)
+    "final answer" (Some "No iterations")
+    (Memory.get_answer updated_memory)
 
 let test_executor_unsupported_tool () =
   let fake_chat ?temperature:_ ?model:_ _client ~messages:_ =
@@ -349,7 +410,8 @@ let test_executor_unsupported_tool () =
     ]
   in
   let error =
-    run_lwt_result_expect_error (Executor.execute executor plan ~memory ~goal:"Unsupported tool")
+    run_lwt_result_expect_error
+      (Executor.execute executor plan ~memory ~goal:"Unsupported tool")
   in
   check Alcotest.bool "unsupported tool message" true
     (string_contains ~needle:"Unsupported tool" error)
@@ -386,11 +448,15 @@ let test_planner_extract_json () =
   | Ok _ -> Alcotest.fail "Expected extraction to fail"
 
 let test_planner_invalid_json_response () =
-  let fake_chat ?temperature:_ ?model:_ _client ~messages:_ = Lwt.return_ok "no json here" in
+  let fake_chat ?temperature:_ ?model:_ _client ~messages:_ =
+    Lwt.return_ok "no json here"
+  in
   let client = Openai_client.create ~api_key:"test" () in
   let planner = Planner.create ~chat:fake_chat client in
   let memory = Memory.init "Invalid planner" in
-  let error = run_lwt_result_expect_error (Planner.plan planner ~goal:"Invalid" ~memory) in
+  let error =
+    run_lwt_result_expect_error (Planner.plan planner ~goal:"Invalid" ~memory)
+  in
   check Alcotest.bool "missing json error" true
     (string_contains ~needle:"did not include JSON object" error)
 
@@ -406,11 +472,25 @@ let test_planner_schema_error () =
     (string_contains ~needle:"Planner JSON schema error" error);
   check Alcotest.bool "mentions unknown" true (string_contains ~needle:"unknown" error)
 
+let test_planner_missing_plan_field () =
+  let fake_chat ?temperature:_ ?model:_ _client ~messages:_ =
+    Lwt.return_ok "{\"steps\": []}"
+  in
+  let client = Openai_client.create ~api_key:"test" () in
+  let planner = Planner.create ~chat:fake_chat client in
+  let memory = Memory.init "Missing plan" in
+  let error =
+    run_lwt_result_expect_error (Planner.plan planner ~goal:"Missing" ~memory)
+  in
+  check Alcotest.bool "missing plan error" true
+    (string_contains ~needle:"Plan JSON must contain 'plan' or 'nodes'" error)
+
 let test_planner_plan_integration () =
   let captured_messages = ref [] in
   let fake_chat ?temperature:_ ?model:_ _client ~messages =
     captured_messages := messages;
-    Lwt.return_ok "{\"plan\": [{\"type\": \"finish\", \"id\": \"finish\", \"summary\": \"Done\"}]}"
+    Lwt.return_ok
+      "{\"plan\": [{\"type\": \"finish\", \"id\": \"finish\", \"summary\": \"Done\"}]}"
   in
   let client = Openai_client.create ~api_key:"test" () in
   let planner = Planner.create ~chat:fake_chat client in
@@ -426,8 +506,10 @@ let test_planner_plan_integration () =
   match !captured_messages with
   | _system :: user :: _ ->
     check Alcotest.string "user role" "user" user.Openai_client.Message.role;
-    check Alcotest.bool "goal included" true (string_contains ~needle:"Plan goal" user.content);
-    check Alcotest.bool "memory snapshot included" true (string_contains ~needle:"key" user.content)
+    check Alcotest.bool "goal included" true
+      (string_contains ~needle:"Plan goal" user.content);
+    check Alcotest.bool "memory snapshot included" true
+      (string_contains ~needle:"key" user.content)
   | _ -> Alcotest.fail "Expected conversation with system and user messages"
 
 let quick_case name fn = (name, `Quick, fn)
@@ -446,6 +528,7 @@ let raw_suites =
         quick_case "load corrupted json" test_memory_load_corrupted_json;
         quick_case "load bad version" test_memory_load_bad_version;
         quick_case "load bad status" test_memory_load_bad_status;
+        quick_case "load bad iterations" test_memory_load_bad_iterations;
       ] );
     ( "Nodes",
       [
@@ -457,6 +540,7 @@ let raw_suites =
         quick_case "conditions" test_executor_condition_evaluation;
         quick_case "llm flow" test_executor_llm_flow;
         quick_case "loop respects max iterations" test_executor_loop_max_iterations;
+        quick_case "loop short circuit" test_executor_loop_condition_short_circuit;
         quick_case "unsupported tool" test_executor_unsupported_tool;
       ] );
     ( "Planner",
@@ -466,6 +550,7 @@ let raw_suites =
         quick_case "extract json" test_planner_extract_json;
         quick_case "invalid json response" test_planner_invalid_json_response;
         quick_case "schema error" test_planner_schema_error;
+        quick_case "missing plan field" test_planner_missing_plan_field;
         quick_case "plan integration" test_planner_plan_integration;
       ] );
   ]

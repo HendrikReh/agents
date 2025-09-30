@@ -101,8 +101,7 @@ let rec condition_of_yojson = function
     | Some (`String other) -> parse_errorf "Unsupported condition type '%s'" other
     | Some _ -> parse_errorf "Condition 'type' must be string"
     | None ->
-      parse_errorf "Condition must contain 'type': %s" (Yojson.Safe.to_string json)
-  )
+      parse_errorf "Condition must contain 'type': %s" (Yojson.Safe.to_string json) )
   | json -> parse_errorf "Condition must be object, got %s" (Yojson.Safe.to_string json)
 
 and node_of_yojson = function
@@ -115,8 +114,7 @@ and node_of_yojson = function
         | _ -> (
           match List.assoc_opt "description" fields with
           | Some (`String s) -> s
-          | _ -> string_field fields "id"
-        )
+          | _ -> string_field fields "id" )
       in
       let action =
         {
@@ -177,8 +175,7 @@ and node_of_yojson = function
       Finish finish
     | Some (`String other) -> parse_errorf "Unsupported node type '%s'" other
     | Some _ -> parse_errorf "Node 'type' must be string"
-    | None -> parse_errorf "Node missing 'type': %s" (Yojson.Safe.to_string json)
-  )
+    | None -> parse_errorf "Node missing 'type': %s" (Yojson.Safe.to_string json) )
   | json -> parse_errorf "Node must be object, got %s" (Yojson.Safe.to_string json)
 
 let plan_of_yojson json =
@@ -191,9 +188,7 @@ let plan_of_yojson json =
       match List.assoc_opt "nodes" fields with
       | Some (`List nodes) -> List.map node_of_yojson nodes
       | Some _ -> parse_errorf "'nodes' must be list"
-      | None -> parse_errorf "Plan JSON must contain 'plan' or 'nodes'"
-    )
-  )
+      | None -> parse_errorf "Plan JSON must contain 'plan' or 'nodes'" ) )
   | `List nodes -> List.map node_of_yojson nodes
   | _ -> parse_errorf "Plan JSON must be object or list"
 
