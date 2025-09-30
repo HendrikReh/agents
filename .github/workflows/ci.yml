@@ -53,8 +53,11 @@ jobs:
       run: opam install . --deps-only
 
     - name: Check for build warnings
+      shell: bash
+      env:
+        OCAMLPARAM: _,warn-error=+a
       run: |
-        opam exec -- dune build --display=short 2>&1 | tee build.log
-        ! grep -E "(Warning|Error)" build.log
+        set -o pipefail
+        opam exec -- dune build --display=short
 
 
