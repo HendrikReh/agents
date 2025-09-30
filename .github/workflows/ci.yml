@@ -50,7 +50,7 @@ jobs:
         ocaml-compiler: 5.2.x
 
     - name: Install dependencies
-      run: opam install . --deps-only
+      run: opam install . --deps-only --with-test
 
     - name: Check for build warnings
       shell: bash
