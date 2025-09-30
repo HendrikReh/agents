@@ -99,6 +99,28 @@ The system consists of several key modules:
 
 The suite stubs every OpenAI call, so no network access or API keys are needed. Recent additions exercise planner schema failures (including missing plan fields), executor loop bounds/unsupported tools, and memory persistence error handling to guard common edge cases.
 
+### Local CI Testing with act
+
+Test GitHub Actions workflows locally using [act](https://github.com/nektos/act):
+
+```bash
+# Install act
+brew install act  # macOS
+# or: curl -s https://raw.githubusercontent.com/nektos/act/master/install.sh | bash
+
+# Run the lint job locally
+act push -j lint \
+    -P ubuntu-latest=catthehacker/ubuntu:act-latest \
+    --container-architecture linux/amd64
+
+# Run a specific matrix job
+act push -j build --matrix os=ubuntu-latest,ocaml-compiler=5.2.x
+```
+
+**Note**: The OCaml setup action (`setup-ocaml@v3`) is automatically skipped when running under act due to Node.js version incompatibility. The workflow will succeed with informational output. For full integration testing, push to a branch and let GitHub Actions run.
+
+See [docs/DEVELOPER.md](docs/DEVELOPER.md#local-ci-with-act) for detailed configuration and troubleshooting.
+
 ### Code Formatting
 
 Once `.ocamlformat` is configured:

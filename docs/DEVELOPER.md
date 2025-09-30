@@ -64,23 +64,136 @@ let my_function () =
 
 ### Local CI with `act`
 
-You can replay the GitHub Actions matrix locally:
+[act](https://github.com/nektos/act) lets you run GitHub Actions workflows locally for faster iteration without pushing to remote branches.
 
-1. Install [`act`](https://github.com/nektos/act) (e.g. `brew install act`).
-2. On Apple Silicon, add a default config `~/.actrc` so the runner pulls x86_64 images:
-   ```
-   --container-architecture linux/amd64
-   -P ubuntu-latest=catthehacker/ubuntu:act-latest
-   -P macos-latest=catthehacker/ubuntu:act-latest
-   ```
-3. Run the workflow slice you care about, e.g. the linux/OCaml 5.2 job:
-   ```bash
-   act push -j build --matrix '{"os":"ubuntu-latest","ocaml-compiler":"5.2.x"}' \
-       --container-architecture linux/amd64
-   ```
-   Repeat with `"5.1.x"` for the other compiler variant. The macOS matrix is large/slow; map it to the Ubuntu image (as above) or run it on GitHub’s runners instead.
+#### Installation
 
-Common troubleshooting: if you see `ReferenceError: File is not defined`, it means the container architecture wasn’t forced to `linux/amd64`. Adjust the config or pass `--container-architecture linux/amd64` explicitly.
+```bash
+# macOS
+brew install act
+
+# Linux
+curl -s https://raw.githubusercontent.com/nektos/act/master/install.sh | bash
+
+# Windows (via Chocolatey)
+choco install act-cli
+```
+
+#### Configuration
+
+Create `~/.actrc` to set default options (especially important on Apple Silicon):
+
+```bash
+# Use x86_64 architecture for compatibility
+--container-architecture linux/amd64
+
+# Map GitHub's runners to catthehacker images
+-P ubuntu-latest=catthehacker/ubuntu:act-latest
+-P macos-latest=catthehacker/ubuntu:act-latest
+```
+
+#### Usage Examples
+
+**Run the lint job:**
+
+```bash
+act push -j lint
+```
+
+**Run a specific build matrix job:**
+
+```bash
+# OCaml 5.2.x on Ubuntu
+act push -j build --matrix os=ubuntu-latest,ocaml-compiler=5.2.x
+
+# OCaml 5.1.x on Ubuntu
+act push -j build --matrix os=ubuntu-latest,ocaml-compiler=5.1.x
+```
+
+**Run all jobs (full CI simulation):**
+
+```bash
+act push
+```
+
+**Run with verbose output:**
+
+```bash
+act push -j lint -v
+```
+
+#### Known Limitations
+
+**setup-ocaml@v3 Action Incompatibility**
+
+The `ocaml/setup-ocaml@v3` action requires Node.js 20+ but act uses Node.js 18 to execute actions (even after `setup-node@v4` installs Node 20). This causes a `ReferenceError: File is not defined` error.
+
+**Our Solution**: The workflow automatically detects when running under act (`env.ACT`) and:
+1. Skips the `setup-ocaml@v3` action
+2. Skips OCaml-dependent build steps
+3. Completes successfully with informational output
+
+This allows workflow validation without full OCaml compilation. To test actual OCaml builds, use one of these alternatives:
+
+**Option 1: Test on GitHub Actions** (recommended)
+```bash
+git checkout -b test-ci
+git push -u origin test-ci
+# Watch the workflow run at github.com/your-repo/actions
+```
+
+**Option 2: Use Docker with OCaml pre-installed**
+```bash
+docker run -it --rm -v "$PWD:/workspace" -w /workspace \
+    ocaml/opam:ubuntu-22.04-ocaml-5.2 \
+    bash -c "opam install . --deps-only && opam exec -- dune build"
+```
+
+**Option 3: Manual local testing**
+```bash
+# Install dependencies
+opam install . --deps-only --with-test
+
+# Run the lint checks manually
+OCAMLPARAM=_,warn-error=+a opam exec -- dune build --display=short
+```
+
+#### Troubleshooting
+
+**Error: `ReferenceError: File is not defined`**
+- Ensure `--container-architecture linux/amd64` is set (especially on Apple Silicon)
+- This is expected for the OCaml setup step; the workflow handles it gracefully
+
+**Docker daemon not running:**
+```bash
+# macOS/Windows
+# Start Docker Desktop
+
+# Linux
+sudo systemctl start docker
+```
+
+**Out of disk space:**
+```bash
+# Clean up old act containers and images
+docker system prune -a
+```
+
+**Permission denied (Docker socket):**
+```bash
+# Linux - add user to docker group
+sudo usermod -aG docker $USER
+newgrp docker
+```
+
+**Workflow takes too long:**
+```bash
+# Test only the fast lint job instead of full matrix
+act push -j lint
+
+# Or test a single matrix combination
+act push -j build --matrix os=ubuntu-latest,ocaml-compiler=5.2.x
+```
 
 ## OpenAI API
 
