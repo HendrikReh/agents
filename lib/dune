@@ -1,4 +1,13 @@
 (library
  (name agents)
- (modules agent errors executor logging memory nodes openai_client planner tools)
+ (modules
+  agent
+  errors
+  executor
+  logging
+  memory
+  nodes
+  openai_client
+  planner
+  tools)
  (libraries lwt lwt.unix cohttp-lwt-unix uri yojson logs logs.lwt))
