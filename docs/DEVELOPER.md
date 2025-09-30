@@ -259,24 +259,48 @@ dune exec agents -- --load-state approach_b.json --save-state approach_b.json
 
 ## Testing
 
-Run the test suite:
+### Philosophy
+
+All tests live in `test/test_agents.ml` and are written with [Alcotest](https://github.com/mirage/alcotest). The guiding principles are:
+
+- **Fast & deterministic** – every case runs in milliseconds so `dune runtest` stays snappy.
+- **No live APIs** – LLM interactions are replaced with deterministic stubs, so CI never needs network access or secrets.
+- **Black-box behaviour** – we test the public surface of each module (memory, nodes, executor, planner) instead of implementation details.
+- **Single binary** – one test executable keeps the Dune setup simple while still grouping cases by suite inside Alcotest.
+
+### Running the Suite
+
+The default run executes every case:
 
 ```bash
 dune runtest
 ```
 
-Tests use stubbed OpenAI clients (no real network calls) to ensure deterministic behavior.
+To focus on the “quick” subset (all of our tests fall into this bucket today) you can use Alcotest’s built-in filter:
 
-### Persistence Tests
+```bash
+ALCOTEST_QUICK_TESTS=1 dune runtest
+```
 
-The test suite includes comprehensive tests for state persistence:
-- `test_memory_serialization_roundtrip`: JSON serialization/deserialization
-- `test_memory_status_serialization`: All status types (In_progress, Completed, Failed)
-- `test_memory_save_load_file`: File I/O operations
-- `test_memory_load_nonexistent`: Error handling
+Verbose output (disables log capturing):
 
-Run a specific test:
+```bash
+ALCOTEST_VERBOSE=1 dune runtest
+```
+
+To run the binary directly (useful for attaching a debugger):
 
 ```bash
 dune exec test/test_agents.exe
 ```
+
+### Test Coverage
+
+The suite currently exercises:
+
+- **Memory** – inits, variable CRUD, completion/failed flows, JSON round-trips, file persistence, and error paths.
+- **Nodes** – Yojson parsers for actions and branches, including graceful failure cases.
+- **Executor** – condition evaluation across all supported predicates and the LLM action path via a stubbed client.
+- **Planner** – code fence stripping, relaxed JSON extraction, and end-to-end planning with a stubbed OpenAI chat.
+
+Adding new behaviour? Please extend the relevant suite and keep tests stubbed/offline. If you introduce genuinely slow scenarios, mark them with `` `Slow`` and document how to skip them.

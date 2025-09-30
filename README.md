@@ -91,11 +91,13 @@ The system consists of several key modules:
 
 ## Development
 
-### Running Tests
+### Testing
 
-```bash
-dune runtest
-```
+- `dune runtest` – runs the full Alcotest suite (all cases are fast/deterministic).
+- `ALCOTEST_QUICK_TESTS=1 dune runtest` – run only tests marked as quick (current default).
+- `ALCOTEST_VERBOSE=1 dune runtest` – stream captured output to the terminal for debugging.
+
+Tests stub all OpenAI calls, so no network access or API keys are needed.
 
 ### Code Formatting
 
