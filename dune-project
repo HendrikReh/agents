@@ -27,7 +27,8 @@
   yojson
   cmdliner
   logs
-  fmt)
+  fmt
+  (alcotest :with-test))
  (tags
   ("agent" "planner" "langgraph")))
 

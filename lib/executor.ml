@@ -22,14 +22,24 @@ let normalise_save_key action =
   | Some key when String.trim key <> "" -> String.trim key
   | _ -> action.Nodes.id
 
+type chat_fn =
+  ?temperature:float ->
+  ?model:string option ->
+  Openai_client.t ->
+  messages:Openai_client.Message.t list -> (string, string) result Lwt.t
+
+let default_chat : chat_fn = Openai_client.chat
+
 type t = {
   client : Openai_client.t;
   default_loop_iterations : int;
+  chat : chat_fn;
 }
 
-let create ?(default_loop_iterations = default_loop_iterations) client =
+let create ?(default_loop_iterations = default_loop_iterations) ?chat client =
+  let chat = Option.value ~default:default_chat chat in
   Log.info (fun m -> m "Creating executor with default_loop_iterations=%d" default_loop_iterations);
-  { client; default_loop_iterations }
+  { client; default_loop_iterations; chat }
 
 let render_action_prompt ~goal ~memory (action : Nodes.action) =
   Printf.sprintf
@@ -63,7 +73,7 @@ let run_llm_action t ~goal ~memory (action : Nodes.action) =
       Openai_client.Message.{ role = "user"; content = prompt };
     ]
   in
-  let* response = Openai_client.chat t.client ~messages ~temperature:0.2 in
+  let* response = t.chat t.client ~messages ~temperature:0.2 in
   let key = normalise_save_key action in
   Log.debug (fun m -> m "Saving action result to key: %s" key);
   Memory.set_variable memory key (`String response);

@@ -88,15 +88,25 @@ module type S = sig
   val plan : goal:string -> memory:Memory.t -> (Nodes.plan, string) result Lwt.t
 end
 
+type chat_fn =
+  ?temperature:float ->
+  ?model:string option ->
+  Openai_client.t ->
+  messages:Openai_client.Message.t list -> (string, string) result Lwt.t
+
+let default_chat : chat_fn = Openai_client.chat
+
 type t = {
   client : Openai_client.t;
   system_prompt : string;
   temperature : float;
+  chat : chat_fn;
 }
 
-let create ?(system_prompt = default_system_prompt) ?(temperature = 0.1) client =
+let create ?(system_prompt = default_system_prompt) ?(temperature = 0.1) ?chat client =
+  let chat = Option.value ~default:default_chat chat in
   Log.info (fun m -> m "Creating planner with temperature=%.2f" temperature);
-  { client; system_prompt; temperature }
+  { client; system_prompt; temperature; chat }
 
 let render_user_prompt ~goal ~memory =
   Printf.sprintf
@@ -119,7 +129,7 @@ let plan t ~goal ~memory =
       Openai_client.Message.{ role = "user"; content = render_user_prompt ~goal ~memory };
     ]
   in
-  let* raw = Openai_client.chat ~temperature:t.temperature t.client ~messages in
+  let* raw = t.chat ~temperature:t.temperature t.client ~messages in
   Log.debug (fun m -> m "Received raw plan response: %s..." (String.sub raw 0 (min 100 (String.length raw))));
   match extract_json_candidate raw with
   | Error msg ->

@@ -21,6 +21,7 @@ depends: [
   "cmdliner"
   "logs"
   "fmt"
+  "alcotest" {with-test}
   "odoc" {with-doc}
 ]
 build: [
