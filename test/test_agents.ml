@@ -15,9 +15,7 @@ let status_testable =
   Alcotest.testable pp ( = )
 
 let run_lwt_result_or_fail promise =
-  match Lwt_main.run promise with
-  | Ok value -> value
-  | Error msg -> Alcotest.fail msg
+  match Lwt_main.run promise with Ok value -> value | Error msg -> Alcotest.fail msg
 
 let run_lwt_result_expect_error promise =
   match Lwt_main.run promise with
@@ -28,12 +26,9 @@ let string_contains ~needle haystack =
   let needle_len = String.length needle in
   let haystack_len = String.length haystack in
   let rec scan idx =
-    if idx + needle_len > haystack_len then
-      false
-    else if String.sub haystack idx needle_len = needle then
-      true
-    else
-      scan (idx + 1)
+    if idx + needle_len > haystack_len then false
+    else if String.sub haystack idx needle_len = needle then true
+    else scan (idx + 1)
   in
   scan 0
 
@@ -43,8 +38,7 @@ let write_file path content =
 
 let check (type a) (testable : a Alcotest.testable) msg expected actual =
   let module T = (val testable : Alcotest.TESTABLE with type t = a) in
-  if T.equal expected actual then
-    ()
+  if T.equal expected actual then ()
   else
     let message =
       Format.asprintf "%s\nexpected: %a\nactual: %a" msg T.pp expected T.pp actual
@@ -71,10 +65,12 @@ let test_memory_completion () =
   let mem = Memory.init test_goal in
   let answer = "The answer is 4" in
   Memory.mark_completed mem answer;
-  (match Memory.status mem with
+  ( match Memory.status mem with
   | Memory.Completed stored -> check Alcotest.string "completed answer" answer stored
-  | _ -> Alcotest.fail "Status should be completed");
-  check (Alcotest.option Alcotest.string) "get_answer" (Some answer) (Memory.get_answer mem)
+  | _ -> Alcotest.fail "Status should be completed" );
+  check
+    (Alcotest.option Alcotest.string)
+    "get_answer" (Some answer) (Memory.get_answer mem)
 
 let test_memory_serialization_roundtrip () =
   let mem = Memory.init "Test goal for serialization" in
@@ -87,42 +83,44 @@ let test_memory_serialization_roundtrip () =
   let json = Memory.to_yojson mem in
   match Memory.of_yojson json with
   | Error msg -> Alcotest.failf "Deserialization failed: %s" msg
-  | Ok restored ->
-      check Alcotest.string "goal" "Test goal for serialization" (Memory.goal restored);
-      check Alcotest.int "iterations" 2 (Memory.iterations restored);
-      check (Alcotest.option Alcotest.string) "last_result" (Some "Last result text") (Memory.last_result restored);
-      (match Memory.get_variable restored "key1" with
-      | Some (`String v) -> check Alcotest.string "key1" "value1" v
-      | _ -> Alcotest.fail "Expected string for key1");
-      (match Memory.get_variable restored "key2" with
-      | Some (`Int v) -> check Alcotest.int "key2" 42 v
-      | _ -> Alcotest.fail "Expected int for key2");
-      (match Memory.get_variable restored "key3" with
-      | Some (`List values) -> check Alcotest.int "key3 length" 2 (List.length values)
-      | _ -> Alcotest.fail "Expected list for key3")
+  | Ok restored -> (
+    check Alcotest.string "goal" "Test goal for serialization" (Memory.goal restored);
+    check Alcotest.int "iterations" 2 (Memory.iterations restored);
+    check
+      (Alcotest.option Alcotest.string)
+      "last_result" (Some "Last result text") (Memory.last_result restored);
+    ( match Memory.get_variable restored "key1" with
+    | Some (`String v) -> check Alcotest.string "key1" "value1" v
+    | _ -> Alcotest.fail "Expected string for key1" );
+    ( match Memory.get_variable restored "key2" with
+    | Some (`Int v) -> check Alcotest.int "key2" 42 v
+    | _ -> Alcotest.fail "Expected int for key2" );
+    match Memory.get_variable restored "key3" with
+    | Some (`List values) -> check Alcotest.int "key3 length" 2 (List.length values)
+    | _ -> Alcotest.fail "Expected list for key3" )
 
 let test_memory_status_serialization () =
   let mem = Memory.init "Test status" in
   let json_in_progress = Memory.to_yojson mem in
-  (match Memory.of_yojson json_in_progress with
+  ( match Memory.of_yojson json_in_progress with
   | Ok restored -> check status_testable "in_progress" Memory.In_progress (Memory.status restored)
-  | Error _ -> Alcotest.fail "Deserialization should succeed");
+  | Error _ -> Alcotest.fail "Deserialization should succeed" );
   Memory.mark_completed mem "Test answer";
   let json_completed = Memory.to_yojson mem in
-  (match Memory.of_yojson json_completed with
+  ( match Memory.of_yojson json_completed with
   | Ok restored -> (
-      match Memory.status restored with
-      | Memory.Completed answer -> check Alcotest.string "completed" "Test answer" answer
-      | _ -> Alcotest.fail "Status should be completed")
-  | Error _ -> Alcotest.fail "Deserialization should succeed");
+    match Memory.status restored with
+    | Memory.Completed answer -> check Alcotest.string "completed" "Test answer" answer
+    | _ -> Alcotest.fail "Status should be completed" )
+  | Error _ -> Alcotest.fail "Deserialization should succeed" );
   let mem_failed = Memory.init "Test failed" in
   Memory.mark_failed mem_failed ~reason:"Test failure";
   let json_failed = Memory.to_yojson mem_failed in
   match Memory.of_yojson json_failed with
   | Ok restored -> (
-      match Memory.status restored with
-      | Memory.Failed reason -> check Alcotest.string "failed" "Test failure" reason
-      | _ -> Alcotest.fail "Status should be failed")
+    match Memory.status restored with
+    | Memory.Failed reason -> check Alcotest.string "failed" "Test failure" reason
+    | _ -> Alcotest.fail "Status should be failed" )
   | Error _ -> Alcotest.fail "Deserialization should succeed"
 
 let test_memory_save_load_file () =
@@ -133,22 +131,22 @@ let test_memory_save_load_file () =
       let mem = Memory.init "File persistence test" in
       Memory.set_variable_string mem "saved_var" "saved_value";
       Memory.bump_iteration mem;
-      (match Memory.save_to_file mem temp_file with
+      ( match Memory.save_to_file mem temp_file with
       | Ok () -> ()
-      | Error msg -> Alcotest.failf "Save failed: %s" msg);
+      | Error msg -> Alcotest.failf "Save failed: %s" msg );
       match Memory.load_from_file temp_file with
       | Error msg -> Alcotest.failf "Load failed: %s" msg
       | Ok restored ->
-          check Alcotest.string "goal" "File persistence test" (Memory.goal restored);
-          check Alcotest.int "iterations" 1 (Memory.iterations restored);
-          (match Memory.get_variable restored "saved_var" with
-          | Some (`String v) -> check Alcotest.string "saved_var" "saved_value" v
-          | _ -> Alcotest.fail "Expected saved_var"))
+        check Alcotest.string "goal" "File persistence test" (Memory.goal restored);
+        check Alcotest.int "iterations" 1 (Memory.iterations restored);
+        (match Memory.get_variable restored "saved_var" with
+        | Some (`String v) -> check Alcotest.string "saved_var" "saved_value" v
+        | _ -> Alcotest.fail "Expected saved_var") )
 
 let test_memory_load_nonexistent () =
   match Memory.load_from_file "/nonexistent/path/to/file.json" with
   | Error msg ->
-      check Alcotest.bool "message" true (String.starts_with ~prefix:"State file not found" msg)
+    check Alcotest.bool "message" true (String.starts_with ~prefix:"State file not found" msg)
   | Ok _ -> Alcotest.fail "Expected load to fail"
 
 let test_memory_load_corrupted_json () =
@@ -159,11 +157,9 @@ let test_memory_load_corrupted_json () =
       write_file temp_file "not json";
       match Memory.load_from_file temp_file with
       | Error msg ->
-          check Alcotest.bool
-            "corrupted json message"
-            true
-            (string_contains ~needle:"Failed to parse state file" msg)
-      | Ok _ -> Alcotest.fail "Expected corrupted load to fail")
+        check Alcotest.bool "corrupted json message" true
+          (string_contains ~needle:"Failed to parse state file" msg)
+      | Ok _ -> Alcotest.fail "Expected corrupted load to fail" )
 
 let test_memory_load_bad_version () =
   let temp_file = Filename.temp_file "agent_test" ".json" in
@@ -174,8 +170,9 @@ let test_memory_load_bad_version () =
         "{\"version\": 2, \"goal\": \"Goal\", \"status\": {\"type\": \"in_progress\"}, \"last_result\": null, \"iterations\": 0, \"variables\": []}";
       match Memory.load_from_file temp_file with
       | Error msg ->
-          check Alcotest.bool "bad version message" true (string_contains ~needle:"Unsupported schema version" msg)
-      | Ok _ -> Alcotest.fail "Expected unsupported version to fail")
+        check Alcotest.bool "bad version message" true
+          (string_contains ~needle:"Unsupported schema version" msg)
+      | Ok _ -> Alcotest.fail "Expected unsupported version to fail" )
 
 let test_memory_load_bad_status () =
   let temp_file = Filename.temp_file "agent_test" ".json" in
@@ -186,8 +183,9 @@ let test_memory_load_bad_status () =
         "{\"version\": 1, \"goal\": \"Goal\", \"status\": {\"type\": \"unknown\"}, \"last_result\": null, \"iterations\": 0, \"variables\": []}";
       match Memory.load_from_file temp_file with
       | Error msg ->
-          check Alcotest.bool "bad status message" true (string_contains ~needle:"Unknown status type" msg)
-      | Ok _ -> Alcotest.fail "Expected bad status to fail")
+        check Alcotest.bool "bad status message" true
+          (string_contains ~needle:"Unknown status type" msg)
+      | Ok _ -> Alcotest.fail "Expected bad status to fail" )
 
 (* Node parsing tests *)
 
@@ -204,10 +202,10 @@ let test_parse_action_node () =
   in
   match Nodes.node_of_yojson json with
   | Nodes.Action action ->
-      check Alcotest.string "id" "test_action" action.Nodes.id;
-      check Alcotest.string "label" "Test Action" action.Nodes.label;
-      check Alcotest.string "prompt" "Do something" action.Nodes.prompt;
-      check (Alcotest.option Alcotest.string) "tool" (Some "llm") action.Nodes.tool
+    check Alcotest.string "id" "test_action" action.Nodes.id;
+    check Alcotest.string "label" "Test Action" action.Nodes.label;
+    check Alcotest.string "prompt" "Do something" action.Nodes.prompt;
+    check (Alcotest.option Alcotest.string) "tool" (Some "llm") action.Nodes.tool
   | _ -> Alcotest.fail "Expected action node"
 
 let test_parse_branch_node () =
@@ -216,17 +214,18 @@ let test_parse_branch_node () =
       [
         ("type", `String "branch");
         ("id", `String "test_branch");
-        ("condition", `Assoc [ ("type", `String "has_variable"); ("key", `String "result") ]);
+        ( "condition",
+          `Assoc [ ("type", `String "has_variable"); ("key", `String "result") ] );
         ("if_true", `List []);
         ("if_false", `List []);
       ]
   in
   match Nodes.node_of_yojson json with
   | Nodes.Branch branch -> (
-      check Alcotest.string "branch id" "test_branch" branch.Nodes.id;
-      match branch.Nodes.condition with
-      | Nodes.Has_variable key -> check Alcotest.string "branch key" "result" key
-      | _ -> Alcotest.fail "Expected has_variable condition")
+    check Alcotest.string "branch id" "test_branch" branch.Nodes.id;
+    match branch.Nodes.condition with
+    | Nodes.Has_variable key -> check Alcotest.string "branch key" "result" key
+    | _ -> Alcotest.fail "Expected has_variable condition" )
   | _ -> Alcotest.fail "Expected branch node"
 
 (* Nodes / executor tests *)
@@ -235,14 +234,22 @@ let test_executor_condition_evaluation () =
   let memory = Memory.init "Test conditions" in
   Memory.set_variable_string memory "key1" "value1";
   Memory.set_variable memory "key2" (`Int 42);
-  check Alcotest.bool "has_variable" true (Executor.evaluate_condition memory (Nodes.Has_variable "key1"));
-  check Alcotest.bool "missing variable" false (Executor.evaluate_condition memory (Nodes.Has_variable "missing"));
-  check Alcotest.bool "not_has_variable" true (Executor.evaluate_condition memory (Nodes.Not_has_variable "missing"));
-  check Alcotest.bool "not_has_variable false" false (Executor.evaluate_condition memory (Nodes.Not_has_variable "key1"));
-  check Alcotest.bool "equals true" true (Executor.evaluate_condition memory (Nodes.Equals { key = "key1"; value = "value1" }));
-  check Alcotest.bool "equals false" false (Executor.evaluate_condition memory (Nodes.Equals { key = "key1"; value = "wrong" }));
-  check Alcotest.bool "not condition" true (Executor.evaluate_condition memory (Nodes.Not (Nodes.Has_variable "missing")));
-  check Alcotest.bool "not condition false" false (Executor.evaluate_condition memory (Nodes.Not (Nodes.Has_variable "key1")))
+  check Alcotest.bool "has_variable" true
+    (Executor.evaluate_condition memory (Nodes.Has_variable "key1"));
+  check Alcotest.bool "missing variable" false
+    (Executor.evaluate_condition memory (Nodes.Has_variable "missing"));
+  check Alcotest.bool "not_has_variable" true
+    (Executor.evaluate_condition memory (Nodes.Not_has_variable "missing"));
+  check Alcotest.bool "not_has_variable false" false
+    (Executor.evaluate_condition memory (Nodes.Not_has_variable "key1"));
+  check Alcotest.bool "equals true" true
+    (Executor.evaluate_condition memory (Nodes.Equals { key = "key1"; value = "value1" }));
+  check Alcotest.bool "equals false" false
+    (Executor.evaluate_condition memory (Nodes.Equals { key = "key1"; value = "wrong" }));
+  check Alcotest.bool "not condition" true
+    (Executor.evaluate_condition memory (Nodes.Not (Nodes.Has_variable "missing")));
+  check Alcotest.bool "not condition false" false
+    (Executor.evaluate_condition memory (Nodes.Not (Nodes.Has_variable "key1")))
 
 let test_executor_llm_flow () =
   let responses = ref [] in
@@ -271,10 +278,12 @@ let test_executor_llm_flow () =
   in
   check Alcotest.bool "finished" true finished;
   check Alcotest.int "iterations" 1 (Memory.iterations memory);
-  (match Memory.get_variable updated_memory "action_result" with
+  ( match Memory.get_variable updated_memory "action_result" with
   | Some (`String v) -> check Alcotest.string "action result" "Stub result" v
-  | _ -> Alcotest.fail "Expected action result");
-  check (Alcotest.option Alcotest.string) "final answer" (Some "Completed") (Memory.get_answer updated_memory);
+  | _ -> Alcotest.fail "Expected action result" );
+  check
+    (Alcotest.option Alcotest.string)
+    "final answer" (Some "Completed") (Memory.get_answer updated_memory);
   check Alcotest.int "messages sent" 2 (List.length !responses)
 
 let test_executor_loop_max_iterations () =
@@ -313,14 +322,12 @@ let test_executor_loop_max_iterations () =
   in
   check Alcotest.bool "finished" true finished;
   check Alcotest.int "loop iterations" 2 !call_count;
-  (match Memory.get_variable updated_memory "loop_result" with
+  ( match Memory.get_variable updated_memory "loop_result" with
   | Some (`String v) -> check Alcotest.string "final loop result" "iteration 2" v
-  | _ -> Alcotest.fail "Expected loop_result variable");
+  | _ -> Alcotest.fail "Expected loop_result variable" );
   check
     (Alcotest.option Alcotest.string)
-    "final answer"
-    (Some "Loop done")
-    (Memory.get_answer updated_memory)
+    "final answer" (Some "Loop done") (Memory.get_answer updated_memory)
 
 let test_executor_unsupported_tool () =
   let fake_chat ?temperature:_ ?model:_ _client ~messages:_ =
@@ -344,7 +351,8 @@ let test_executor_unsupported_tool () =
   let error =
     run_lwt_result_expect_error (Executor.execute executor plan ~memory ~goal:"Unsupported tool")
   in
-  check Alcotest.bool "unsupported tool message" true (string_contains ~needle:"Unsupported tool" error)
+  check Alcotest.bool "unsupported tool message" true
+    (string_contains ~needle:"Unsupported tool" error)
 
 (* Planner tests *)
 
@@ -365,17 +373,17 @@ let test_planner_strip_code_fence () =
 
 let test_planner_extract_json () =
   let valid_json = "{\"plan\": []}" in
-  (match Planner.extract_json_candidate valid_json with
+  ( match Planner.extract_json_candidate valid_json with
   | Ok _ -> ()
-  | Error msg -> Alcotest.failf "Failed to extract valid json: %s" msg);
+  | Error msg -> Alcotest.failf "Failed to extract valid json: %s" msg );
   let with_text = "Some text before {\"plan\": []} some text after" in
-  (match Planner.extract_json_candidate with_text with
+  ( match Planner.extract_json_candidate with_text with
   | Ok _ -> ()
-  | Error msg -> Alcotest.failf "Failed to extract embedded json: %s" msg);
+  | Error msg -> Alcotest.failf "Failed to extract embedded json: %s" msg );
   let invalid = "not json at all" in
-  (match Planner.extract_json_candidate invalid with
+  match Planner.extract_json_candidate invalid with
   | Error _ -> ()
-  | Ok _ -> Alcotest.fail "Expected extraction to fail")
+  | Ok _ -> Alcotest.fail "Expected extraction to fail"
 
 let test_planner_invalid_json_response () =
   let fake_chat ?temperature:_ ?model:_ _client ~messages:_ = Lwt.return_ok "no json here" in
@@ -383,9 +391,7 @@ let test_planner_invalid_json_response () =
   let planner = Planner.create ~chat:fake_chat client in
   let memory = Memory.init "Invalid planner" in
   let error = run_lwt_result_expect_error (Planner.plan planner ~goal:"Invalid" ~memory) in
-  check Alcotest.bool
-    "missing json error"
-    true
+  check Alcotest.bool "missing json error" true
     (string_contains ~needle:"did not include JSON object" error)
 
 let test_planner_schema_error () =
@@ -396,9 +402,7 @@ let test_planner_schema_error () =
   let planner = Planner.create ~chat:fake_chat client in
   let memory = Memory.init "Schema error" in
   let error = run_lwt_result_expect_error (Planner.plan planner ~goal:"Schema" ~memory) in
-  check Alcotest.bool
-    "schema error reported"
-    true
+  check Alcotest.bool "schema error reported" true
     (string_contains ~needle:"Planner JSON schema error" error);
   check Alcotest.bool "mentions unknown" true (string_contains ~needle:"unknown" error)
 
@@ -414,19 +418,19 @@ let test_planner_plan_integration () =
   Memory.set_variable_string memory "key" "value";
   let plan = run_lwt_result_or_fail (Planner.plan planner ~goal:"Plan goal" ~memory) in
   check Alcotest.int "plan length" 1 (List.length plan);
-  (match List.hd plan with
-  | Nodes.Finish finish -> check (Alcotest.option Alcotest.string) "summary" (Some "Done") finish.summary
-  | _ -> Alcotest.fail "Expected finish node");
+  ( match List.hd plan with
+  | Nodes.Finish finish ->
+    check (Alcotest.option Alcotest.string) "summary" (Some "Done") finish.summary
+  | _ -> Alcotest.fail "Expected finish node" );
   check Alcotest.int "messages" 2 (List.length !captured_messages);
   match !captured_messages with
   | _system :: user :: _ ->
-      check Alcotest.string "user role" "user" user.Openai_client.Message.role;
-      check Alcotest.bool "goal included" true (string_contains ~needle:"Plan goal" user.content);
-      check Alcotest.bool "memory snapshot included" true (string_contains ~needle:"key" user.content)
+    check Alcotest.string "user role" "user" user.Openai_client.Message.role;
+    check Alcotest.bool "goal included" true (string_contains ~needle:"Plan goal" user.content);
+    check Alcotest.bool "memory snapshot included" true (string_contains ~needle:"key" user.content)
   | _ -> Alcotest.fail "Expected conversation with system and user messages"
 
 let quick_case name fn = (name, `Quick, fn)
-
 
 let raw_suites =
   [

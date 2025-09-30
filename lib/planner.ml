@@ -44,14 +44,10 @@ let strip_code_fence text =
     let remove_suffix s =
       let s = String.trim s in
       let len = String.length s in
-      if len >= 3 && String.sub s (len - 3) 3 = "```" then
-        String.sub s 0 (len - 3)
-      else
-        s
+      if len >= 3 && String.sub s (len - 3) 3 = "```" then String.sub s 0 (len - 3) else s
     in
     remove_suffix without_prefix |> String.trim
-  else
-    trimmed
+  else trimmed
 
 let extract_json_candidate text =
   let trimmed = strip_code_fence text in
@@ -60,29 +56,30 @@ let extract_json_candidate text =
   in
   match try_direct () with
   | Some json -> Ok json
-  | None ->
-      let len = String.length trimmed in
-      let first_brace = ref None in
-      let last_brace = ref None in
-      for idx = 0 to len - 1 do
-        match trimmed.[idx] with
-        | '{' -> if !first_brace = None then first_brace := Some idx
-        | '}' -> last_brace := Some idx
-        | _ -> ()
-      done;
-      (match (!first_brace, !last_brace) with
-      | Some start_idx, Some end_idx when end_idx > start_idx ->
-          let candidate = String.sub trimmed start_idx (end_idx - start_idx + 1) in
-          (try Ok (Yojson.Safe.from_string candidate) with Yojson.Json_error msg ->
-             Error
-               (Printf.sprintf
-                  "Planner response did not contain valid JSON (parse error: %s).\nRaw: %s"
-                  msg text))
-      | _ ->
-          Error
-            (Printf.sprintf
-               "Planner response did not include JSON object. Raw response: %s"
-               text))
+  | None -> (
+    let len = String.length trimmed in
+    let first_brace = ref None in
+    let last_brace = ref None in
+    for idx = 0 to len - 1 do
+      match trimmed.[idx] with
+      | '{' -> if !first_brace = None then first_brace := Some idx
+      | '}' -> last_brace := Some idx
+      | _ -> ()
+    done;
+    match (!first_brace, !last_brace) with
+    | Some start_idx, Some end_idx when end_idx > start_idx -> (
+      let candidate = String.sub trimmed start_idx (end_idx - start_idx + 1) in
+      try Ok (Yojson.Safe.from_string candidate) with Yojson.Json_error msg ->
+        Error
+          (Printf.sprintf
+             "Planner response did not contain valid JSON (parse error: %s).\nRaw: %s"
+             msg text )
+    )
+    | _ ->
+      Error
+        (Printf.sprintf
+           "Planner response did not include JSON object. Raw response: %s" text )
+  )
 
 module type S = sig
   val plan : goal:string -> memory:Memory.t -> (Nodes.plan, string) result Lwt.t
@@ -92,7 +89,8 @@ type chat_fn =
   ?temperature:float ->
   ?model:string option ->
   Openai_client.t ->
-  messages:Openai_client.Message.t list -> (string, string) result Lwt.t
+  messages:Openai_client.Message.t list ->
+  (string, string) result Lwt.t
 
 let default_chat : chat_fn = Openai_client.chat
 
@@ -118,8 +116,7 @@ Shared memory snapshot:
 Design a plan leveraging available tools. Prefer short, actionable steps.
 Return only JSON following the schema.
 |}
-    goal
-    (Tools.summary_excerpt memory)
+    goal (Tools.summary_excerpt memory)
 
 let plan t ~goal ~memory =
   Log.info (fun m -> m "Generating plan for goal");
@@ -130,17 +127,20 @@ let plan t ~goal ~memory =
     ]
   in
   let* raw = t.chat ~temperature:t.temperature t.client ~messages in
-  Log.debug (fun m -> m "Received raw plan response: %s..." (String.sub raw 0 (min 100 (String.length raw))));
+  Log.debug (fun m ->
+      m "Received raw plan response: %s..."
+        (String.sub raw 0 (min 100 (String.length raw))) );
   match extract_json_candidate raw with
   | Error msg ->
-      Log.err (fun m -> m "Failed to extract JSON from plan: %s" msg);
-      Lwt_result.fail msg
+    Log.err (fun m -> m "Failed to extract JSON from plan: %s" msg);
+    Lwt_result.fail msg
   | Ok json -> (
-      try
-        let parsed_plan = Nodes.plan_of_yojson json in
-        Log.info (fun m -> m "Successfully parsed plan with %d nodes" (List.length parsed_plan));
-        Lwt_result.return parsed_plan
-      with Nodes.Parse_error msg ->
-        Log.err (fun m -> m "Plan schema validation error: %s" msg);
-        Lwt_result.fail
-          (Printf.sprintf "Planner JSON schema error: %s\nRaw: %s" msg raw))
+    try
+      let parsed_plan = Nodes.plan_of_yojson json in
+      Log.info (fun m ->
+          m "Successfully parsed plan with %d nodes" (List.length parsed_plan) );
+      Lwt_result.return parsed_plan
+    with Nodes.Parse_error msg ->
+      Log.err (fun m -> m "Plan schema validation error: %s" msg);
+      Lwt_result.fail (Printf.sprintf "Planner JSON schema error: %s\nRaw: %s" msg raw)
+  )

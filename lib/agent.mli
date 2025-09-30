@@ -20,5 +20,3 @@ val run_with_memory : t -> Memory.t -> (string * Memory.t, string) result Lwt.t
 
     The agent will continue from the iteration count stored in the memory,
     useful for resuming interrupted executions or branching from saved states. *)
-
-

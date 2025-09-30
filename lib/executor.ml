@@ -11,10 +11,11 @@ let rec evaluate_condition memory = function
   | Nodes.Has_variable key -> Option.is_some (Memory.get_variable memory key)
   | Nodes.Not_has_variable key -> Option.is_none (Memory.get_variable memory key)
   | Nodes.Equals { key; value } -> (
-      match Memory.get_variable memory key with
-      | Some (`String stored) -> String.equal stored value
-      | Some json -> String.equal (Yojson.Safe.to_string json) value
-      | None -> false)
+    match Memory.get_variable memory key with
+    | Some (`String stored) -> String.equal stored value
+    | Some json -> String.equal (Yojson.Safe.to_string json) value
+    | None -> false
+  )
   | Nodes.Not condition -> not (evaluate_condition memory condition)
 
 let normalise_save_key action =
@@ -26,7 +27,8 @@ type chat_fn =
   ?temperature:float ->
   ?model:string option ->
   Openai_client.t ->
-  messages:Openai_client.Message.t list -> (string, string) result Lwt.t
+  messages:Openai_client.Message.t list ->
+  (string, string) result Lwt.t
 
 let default_chat : chat_fn = Openai_client.chat
 
@@ -38,7 +40,8 @@ type t = {
 
 let create ?(default_loop_iterations = default_loop_iterations) ?chat client =
   let chat = Option.value ~default:default_chat chat in
-  Log.info (fun m -> m "Creating executor with default_loop_iterations=%d" default_loop_iterations);
+  Log.info (fun m ->
+      m "Creating executor with default_loop_iterations=%d" default_loop_iterations );
   { client; default_loop_iterations; chat }
 
 let render_action_prompt ~goal ~memory (action : Nodes.action) =
@@ -52,9 +55,7 @@ Current memory summary:
 Follow the instruction below and reply with the direct result (no commentary):
 %s
 |}
-    action.Nodes.id
-    action.Nodes.label
-    goal
+    action.Nodes.id action.Nodes.label goal
     (Tools.summary_excerpt memory)
     action.Nodes.prompt
 
@@ -84,18 +85,17 @@ let run_action t ~goal ~memory action =
   match String.lowercase_ascii (tool_or_default action) with
   | "llm" -> run_llm_action t ~goal ~memory action
   | other ->
-      Log.err (fun m -> m "Unsupported tool '%s' for action %s" other action.Nodes.id);
-      Lwt_result.fail (Printf.sprintf "Unsupported tool '%s' for action %s" other action.Nodes.id)
+    Log.err (fun m -> m "Unsupported tool '%s' for action %s" other action.Nodes.id);
+    Lwt_result.fail
+      (Printf.sprintf "Unsupported tool '%s' for action %s" other action.Nodes.id)
 
 let rec run_nodes t ~goal ~memory nodes =
   match nodes with
   | [] -> Lwt_result.return (memory, false)
   | node :: rest ->
-      let* memory_after, finished_node = run_node t ~goal ~memory node in
-      if finished_node then
-        Lwt_result.return (memory_after, true)
-      else
-        run_nodes t ~goal ~memory:memory_after rest
+    let* memory_after, finished_node = run_node t ~goal ~memory node in
+    if finished_node then Lwt_result.return (memory_after, true)
+    else run_nodes t ~goal ~memory:memory_after rest
 
 and run_node t ~goal ~memory = function
   | Nodes.Action action -> run_action t ~goal ~memory action
@@ -119,36 +119,36 @@ and run_loop t ~goal ~memory loop =
   let rec apply iteration memory_acc =
     if not (evaluate_condition memory_acc loop.Nodes.condition) then (
       Log.debug (fun m -> m "Loop condition false at iteration %d" iteration);
-      Lwt_result.return (memory_acc, false))
+      Lwt_result.return (memory_acc, false)
+    )
     else if iteration >= max_iterations then (
       Log.debug (fun m -> m "Loop reached max_iterations at %d" iteration);
-      Lwt_result.return (memory_acc, false))
+      Lwt_result.return (memory_acc, false)
+    )
     else (
       Log.debug (fun m -> m "Loop iteration %d/%d" (iteration + 1) max_iterations);
-      let* memory_body, finished =
-        run_nodes t ~goal ~memory:memory_acc loop.Nodes.body
-      in
-      if finished then
-        Lwt_result.return (memory_body, true)
-      else
-        apply (succ iteration) memory_body)
+      let* memory_body, finished = run_nodes t ~goal ~memory:memory_acc loop.Nodes.body in
+      if finished then Lwt_result.return (memory_body, true)
+      else apply (succ iteration) memory_body
+    )
   in
   apply 0 memory
 
 and run_finish ~memory finish =
   Log.info (fun m -> m "Reached finish node");
-  (match finish.Nodes.summary with
+  ( match finish.Nodes.summary with
   | Some text when String.trim text <> "" ->
-      Log.debug (fun m -> m "Marking completed with summary");
-      Memory.mark_completed memory text
+    Log.debug (fun m -> m "Marking completed with summary");
+    Memory.mark_completed memory text
   | _ -> (
-      match Memory.last_result memory with
-      | Some result when String.trim result <> "" ->
-          Log.debug (fun m -> m "Marking completed with last result");
-          Memory.mark_completed memory result
-      | _ ->
-          Log.debug (fun m -> m "Marking completed with no result");
-          Memory.mark_completed memory "<no result>"));
+    match Memory.last_result memory with
+    | Some result when String.trim result <> "" ->
+      Log.debug (fun m -> m "Marking completed with last result");
+      Memory.mark_completed memory result
+    | _ ->
+      Log.debug (fun m -> m "Marking completed with no result");
+      Memory.mark_completed memory "<no result>"
+  ) );
   Lwt_result.return (memory, true)
 
 let execute t plan ~memory ~goal =
