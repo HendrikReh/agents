@@ -59,16 +59,32 @@ jobs:
         node-version: '20'
 
     - name: Set up OCaml
+      if: ${{ !env.ACT }}
       uses: ocaml/setup-ocaml@v3
       with:
         ocaml-compiler: 5.2.x
       env:
         UNDICI_NO_GLOBAL: 'true'
 
+    - name: Set up OCaml (act local testing)
+      if: ${{ env.ACT }}
+      run: |
+        echo "⚠️  Skipping setup-ocaml@v3 (requires Node 20+, act uses Node 18)"
+        echo ""
+        echo "For local testing with act, use a container with OCaml pre-installed:"
+        echo "  docker run -it --rm ocaml/opam:ubuntu-22.04-ocaml-5.2"
+        echo ""
+        echo "Or test directly on GitHub Actions by pushing to a branch."
+        echo ""
+        echo "This step will exit successfully to allow workflow validation."
+        exit 0
+
     - name: Install dependencies
+      if: ${{ !env.ACT }}
       run: opam install . --deps-only --with-test
 
     - name: Check for build warnings
+      if: ${{ !env.ACT }}
       shell: bash
       env:
         OCAMLPARAM: _,warn-error=+a
